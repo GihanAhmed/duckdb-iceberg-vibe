@@ -236,6 +236,26 @@ python scripts/07_visualization.py
 - 📈 Builds performance dashboards
 - 💾 Exports in multiple formats
 
+## 📦 Output Files Generated
+
+Each script in the pipeline generates specific output files:
+
+### Script → File Generation Map
+
+| Script | Generated Files | Purpose |
+|--------|----------------|---------|
+| `02_data_ingestion.py` | `data/raw/neo_data_YYYYMMDD_HHMMSS.parquet` | Raw NASA NEO data |
+| `03_duckdb_setup.py` | `space_analytics.db` | Local DuckDB database |
+| `04_iceberg_conversion.py` | `data/iceberg_warehouse/neo_approaches_iceberg/`<br>`metadata/metadata.json`<br>`maintenance_report.json` | Iceberg format with metadata |
+| `05_performance_benchmarks.py` | `performance_report.md` | Performance comparison report |
+| `06_advanced_analytics.py` | `analytics_results.md` | Risk analysis, trends, statistics |
+| `07_visualization.py` | `visualizations/performance_comparison.html`<br>`visualizations/risk_assessment.html`<br>`visualizations/discovery_timeline.html`<br>`visualizations/storage_efficiency.html` | Interactive HTML charts |
+
+### Execution Order
+1. **Data Pipeline**: `02` → `03` → `04` (Creates data in multiple formats)
+2. **Analysis Pipeline**: `05` → `06` → `07` (Generates reports and visualizations)
+3. **Interactive Analysis**: Jupyter notebooks use the generated database and files
+
 ## 🎪 Demo Walkthrough
 
 ### Interactive Jupyter Demo (15 minutes)
@@ -249,7 +269,7 @@ jupyter lab notebooks/presentation_demo.ipynb
 2. **Data Overview** (1m) - Dataset introduction
 3. **DuckDB Performance** (2m) - Lightning-fast queries
 4. **Iceberg Integration** (2m) - Modern data lake features
-5. **Performance Comparison** (3m) - Speed benchmarks  
+5. **Performance Comparison** (3m) - Speed benchmarks
 6. **Advanced Analytics** (4m) - NEO risk assessment
 7. **Time Travel** (2m) - Historical data queries
 8. **Visualizations** (1m) - Interactive 3D plots
@@ -639,17 +659,11 @@ NASA API → Raw CSV → Cleaned Parquet → DuckDB → Iceberg → Analytics �
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- **NASA JPL**: For providing the Near-Earth Object close approach data
-- **DuckDB Team**: For the amazing analytical database
-- **Apache Iceberg Community**: For the modern data lake format
-- **Space Data Scientists**: For inspiring this demonstration
 
 ## 📧 Contact
 
-- **Project Maintainer**: [Your Name]
-- **Email**: [your.email@example.com]
+- **Project Maintainer**: Gihan Mahmoud
+- **Email**: gihan.mahmoud@mantelgroup.com.au
 - **GitHub**: [YourGitHubUsername]
 - **LinkedIn**: [Your LinkedIn Profile]
 
