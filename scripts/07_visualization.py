@@ -661,7 +661,7 @@ class SpaceDataVisualizer:
             # Update layout with 3D scene configuration
             fig.update_layout(
                 title={
-                    "text": "3D NEO Discovery Timeline (1900-1966)",
+                    "text": "3D NEO Discovery Timeline Animation",
                     "x": 0.5,
                     "font": {"size": 20, "color": "white"}
                 },
@@ -992,7 +992,7 @@ class SpaceDataVisualizer:
                     ROW_NUMBER() OVER (PARTITION BY approach_year ORDER BY RANDOM()) as rn
                 FROM neo_approaches
                 WHERE approach_year IS NOT NULL
-                    AND approach_year BETWEEN 1900 AND 1966
+                    AND approach_year BETWEEN 1900 AND 2100
                     AND h IS NOT NULL
                     AND dist IS NOT NULL
                     AND v_rel IS NOT NULL
@@ -1052,7 +1052,7 @@ class SpaceDataVisualizer:
     def _create_sample_discovery_data(self) -> pd.DataFrame:
         """Create sample discovery timeline data with extended year range."""
         np.random.seed(42)
-        years = list(range(1900, 1970, 5))  # Every 5 years from 1900 to 1965
+        years = list(range(2025, 2050, 5))  # Every 5 years from 1900 to 1965
         data = []
 
         for year in years:

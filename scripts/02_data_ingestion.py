@@ -76,70 +76,47 @@ class NEODataIngester:
 
     def _download_full_dataset(self, max_retries: int = 3) -> pd.DataFrame:
         """
-        Download complete dataset using pagination and memory management.
+        Download complete dataset in one request (API supports up to 200K records).
 
         Returns:
             Complete DataFrame with all available NEO data
         """
-        base_params = {
+        logger.info("Downloading comprehensive dataset from NASA JPL API...")
+
+        # API can handle up to 200,000 records in one request
+        params = {
             'date-min': '1900-01-01',
             'date-max': '2100-12-31',
-            'dist-max': '10',  # Extended to 10 AU for comprehensive data
+            'dist-max': '0.5',  # 0.5 AU for comprehensive dataset
             'sort': 'date',
             'fullname': 'true',
-            'diameter': 'true'  # Include diameter information
+            'limit': '200000'  # Get all available data (API max)
         }
 
-        all_data = []
-        offset = 0
-        total_records = 0
+        logger.info("Requesting full dataset (1900-2100, <0.5 AU)...")
 
-        logger.info("Starting comprehensive dataset download with chunking...")
+        # Monitor memory before download
+        memory_usage_gb = psutil.virtual_memory().used / (1024**3)
+        logger.info("Current memory usage: %.1f GB", memory_usage_gb)
 
-        while True:
-            # Monitor memory usage
-            memory_usage_gb = psutil.virtual_memory().used / (1024**3)
-            if memory_usage_gb > self.memory_threshold_gb:
-                logger.warning("Memory usage (%.1f GB) exceeds threshold (%.1f GB)",
-                              memory_usage_gb, self.memory_threshold_gb)
-                logger.info("Implementing data sampling strategy...")
-                break
+        # Download all data in one request
+        full_df = self._fetch_api_chunk(params, max_retries)
 
-            chunk_params = base_params.copy()
-            chunk_params.update({
-                'limit': str(self.chunk_size),
-                'offset': str(offset)
-            })
-
-            logger.info("Fetching chunk: offset=%d, size=%d", offset, self.chunk_size)
-
-            chunk_df = self._fetch_api_chunk(chunk_params, max_retries)
-
-            if chunk_df.empty:
-                logger.info("No more data available. Download complete.")
-                break
-
-            all_data.append(chunk_df)
-            total_records += len(chunk_df)
-            offset += self.chunk_size
-
-            logger.info("Downloaded %d total records so far...", total_records)
-
-            # If chunk is smaller than requested, we've reached the end
-            if len(chunk_df) < self.chunk_size:
-                logger.info("Reached end of dataset. Download complete.")
-                break
-
-            # Rate limiting - be respectful to NASA's API
-            time.sleep(1)
-
-        if not all_data:
+        if full_df.empty:
             raise ValueError("No data retrieved from NASA API")
 
-        logger.info("Concatenating %d chunks with %d total records", len(all_data), total_records)
-        full_df = pd.concat(all_data, ignore_index=True)
+        total_records = len(full_df)
+        logger.info("Downloaded %d total records", total_records)
 
-        # Remove duplicates that might occur at chunk boundaries
+        # Check memory after download
+        memory_usage_gb = psutil.virtual_memory().used / (1024**3)
+        logger.info("Memory usage after download: %.1f GB", memory_usage_gb)
+
+        if memory_usage_gb > self.memory_threshold_gb:
+            logger.warning("Memory usage exceeds threshold, consider sampling")
+            # Could implement sampling here if needed
+
+        # Remove duplicates if any
         initial_count = len(full_df)
         full_df = full_df.drop_duplicates(subset=['des', 'cd'], keep='first')
         final_count = len(full_df)
