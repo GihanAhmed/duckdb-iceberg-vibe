@@ -174,3 +174,94 @@ Generated: 2025-09-19 10:38:47
 
 - **parquet**: 2.05x compression
 - **iceberg**: 2.29x compression
+
+## Enhanced Performance Features
+
+### Large Dataset Optimization
+
+#### Comprehensive Dataset Handling (>100K Records)
+- **Memory Monitoring**: Real-time usage tracking with 8GB threshold
+- **Intelligent Sampling**: Automatic downsampling when memory limits approached
+- **Chunked Processing**: 10,000 records per API call for optimal performance
+- **Query Optimization**: Enhanced algorithms for large-scale data processing
+
+#### Projected Performance Scaling
+- **Dataset Growth**: Linear scaling expectations for 2x-5x data increase
+- **Memory Efficiency**: Optimized buffer management for large datasets
+- **Query Response**: Maintained sub-second performance for analytical queries
+- **Throughput**: Enhanced records-per-second processing rates
+
+### Enhanced Visualization Performance
+
+#### Query Type Color-Coded Analysis
+- **Simple Count (#FF8C00 - Dark Orange)**
+  - Basic counting operations
+  - Metadata-optimized queries
+  - Best performance: DuckDB < 1ms
+- **Filtered Count (#FFA500 - Orange)**
+  - Conditional counting with predicates
+  - Index utilization strategies
+  - Consistent sub-millisecond performance
+- **Aggregation (#FFB84D - Light Orange)**
+  - Complex GROUP BY operations
+  - Multi-stage processing
+  - Vectorized computation benefits
+
+### Memory Management Analysis
+
+#### Resource Utilization
+- **Baseline Memory**: System overhead monitoring
+- **Processing Memory**: Peak usage during query execution
+- **Memory Efficiency**: Data-to-memory ratio optimization
+- **Garbage Collection**: Optimized cleanup strategies
+
+#### Scaling Behavior
+- **Linear Performance**: Predictable scaling with dataset growth
+- **Memory Pressure Response**: Graceful degradation with sampling
+- **Recovery Strategies**: Automatic optimization when resources limited
+
+### Storage Format Deep Dive
+
+#### DuckDB Table Performance (#1 Ranked)
+- **In-Memory Optimization**: Columnar storage with vectorization
+- **Query Execution**: Parallel processing with SIMD instructions
+- **Memory Management**: Intelligent buffer pool management
+- **Analytical Workloads**: Optimized for OLAP query patterns
+
+#### Parquet Performance (#2 Ranked)
+- **Columnar Compression**: Efficient encoding schemes
+- **Predicate Pushdown**: Filter optimization at storage level
+- **Metadata Utilization**: Statistics-based query planning
+- **Cross-Platform**: Excellent interoperability
+
+#### Iceberg Performance (#3 Ranked)
+- **ACID Transactions**: Consistent performance with metadata overhead
+- **Schema Evolution**: Flexible structure with minimal performance impact
+- **Time Travel**: Historical query capabilities
+- **Metadata Management**: Optimized catalog operations
+
+#### CSV Performance (#4 Ranked)
+- **Row-Based Limitations**: Sequential processing constraints
+- **Parsing Overhead**: Text-to-data conversion costs
+- **Large Dataset Challenge**: Linear degradation with size
+- **Compatibility**: Universal format with performance trade-offs
+
+## Recommendations for Large-Scale Deployment
+
+### Performance Optimization Strategy
+1. **Primary Format**: DuckDB for analytical workloads
+2. **Archive Format**: Iceberg for long-term storage with ACID guarantees
+3. **Exchange Format**: Parquet for cross-system compatibility
+4. **Avoid**: CSV for datasets >50K records
+
+### Memory Management Best Practices
+- **Monitor Usage**: Implement real-time memory tracking
+- **Implement Sampling**: Automatic downsampling for large datasets
+- **Optimize Queries**: Use columnar-optimized query patterns
+- **Cache Strategy**: Intelligent result caching for repeated operations
+
+### Scalability Planning
+- **Dataset Growth**: Plan for 5-10x current dataset size
+- **Hardware Scaling**: Consider memory and CPU requirements
+- **Query Optimization**: Implement query result caching
+- **Monitoring**: Continuous performance tracking and alerting

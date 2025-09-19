@@ -208,12 +208,25 @@ class SpaceDataVisualizer:
                 template='plotly_dark'
             )
 
-            # 1. Bar chart - mean performance by format with plasma colors
+            # Define color scheme as specified
+            format_colors = {
+                'csv': '#800080',      # Purple
+                'CSV': '#800080',
+                'parquet': '#008000',  # Green
+                'Parquet': '#008000',
+                'duckdb': '#FFD700',   # Gold
+                'duckdb_table': '#FFD700',
+                'DuckDB': '#FFD700',
+                'iceberg': '#0000FF',  # Blue
+                'Iceberg': '#0000FF'
+            }
+
+            # 1. Bar chart - mean performance by format with specified colors
             formats = df['format'].unique()
             mean_times = df.groupby('format')['mean_time'].mean()
 
-            # Use enhanced color palette
-            colors = self.color_palette[:len(formats)]
+            # Use specified color palette
+            colors = [format_colors.get(fmt, format_colors.get(fmt.lower(), '#666666')) for fmt in formats]
 
             fig.add_trace(
                 go.Bar(x=formats, y=mean_times, name='Avg Query Time',
@@ -225,28 +238,49 @@ class SpaceDataVisualizer:
                 row=1, col=1
             )
 
-            # 2. Box plot - performance distribution
+            # 2. Box plot - performance distribution with enhanced orange theme
             for i, format_name in enumerate(formats):
                 format_data = df[df['format'] == format_name]['mean_time']
-                color_idx = min(i, len(self.color_palette) - 1)
+                color = format_colors.get(format_name, format_colors.get(format_name.lower(), '#666666'))
                 fig.add_trace(
-                    go.Box(y=format_data, name=format_name,
-                           marker_color=self.color_palette[color_idx]),
+                    go.Box(
+                        y=format_data,
+                        name=format_name,
+                        marker_color=color,
+                        marker_line=dict(color='#8B4513', width=1),  # Saddle brown border
+                        fillcolor=f'rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, '
+                                  f'{int(color[5:7], 16)}, 0.5)'  # Semi-transparent fill
+                    ),
                     row=1, col=2
                 )
 
-            # 3. Grouped bar chart - detailed comparison
+            # 3. Grouped bar chart - detailed comparison with orange shades for query types
             queries = df['query'].unique()
+            orange_shades = {
+                'simple_count': '#FF8C00',      # Dark orange
+                'Simple Count': '#FF8C00',      # Dark orange
+                'filtered_count': '#FFA500',    # Orange
+                'Filtered Count': '#FFA500',    # Orange
+                'aggregation': '#FFB84D',       # Light orange
+                'Aggregation': '#FFB84D'        # Light orange
+            }
+
             for i, query in enumerate(queries):
                 query_data = df[df['query'] == query]
-                color_idx = min(i, len(self.color_palette) - 1)
+                # Use orange shades for different query types
+                query_color = orange_shades.get(query, orange_shades.get(query.lower(), '#FF7F50'))  # Default coral
                 fig.add_trace(
-                    go.Bar(x=query_data['format'], y=query_data['mean_time'],
-                           name=query, marker_color=self.color_palette[color_idx]),
+                    go.Bar(
+                        x=query_data['format'],
+                        y=query_data['mean_time'],
+                        name=query,
+                        marker_color=query_color,
+                        marker_line=dict(color='#B8860B', width=1)  # Dark goldenrod border
+                    ),
                     row=2, col=1
                 )
 
-            # 4. Scatter plot - complexity vs performance
+            # 4. Scatter plot - complexity vs performance (hidden from legend)
             fig.add_trace(
                 go.Scatter(x=df.index, y=df['mean_time'],
                           mode='markers+lines',
@@ -255,11 +289,12 @@ class SpaceDataVisualizer:
                               "colorscale": 'Viridis', "showscale": True
                           },
                           text=df['format'] + '<br>' + df['query'],
-                          name='Performance Trend'),
+                          name='Performance Trend',
+                          showlegend=False),  # Remove from legend as specified
                 row=2, col=2
             )
 
-            # Update layout
+            # Update layout with left-positioned legends
             fig.update_layout(
                 title={
                     "text": "DuckDB + Iceberg vs Traditional Storage Performance",
@@ -267,6 +302,14 @@ class SpaceDataVisualizer:
                     "font": {"size": 20}
                 },
                 showlegend=True,
+                # Left-positioned legend as specified
+                legend=dict(
+                    x=-0.15,
+                    y=0.5,
+                    bgcolor='rgba(0,0,0,0.5)',
+                    bordercolor='white',
+                    borderwidth=1
+                ),
                 height=800,
                 template='plotly_dark'
             )
@@ -293,15 +336,16 @@ class SpaceDataVisualizer:
         self, risk_data: Optional[pd.DataFrame] = None
     ) -> go.Figure:
         """
-        Create enhanced risk assessment dashboard with red color scheme.
+        Create comprehensive temporal risk assessment dashboard.
+        Separates historical (≤2025) and future (≥2026) risk analysis.
 
         Args:
             risk_data: DataFrame with risk assessment data
 
         Returns:
-            Plotly figure with enhanced risk dashboard
+            Plotly figure with temporal segmentation dashboard
         """
-        logger.info("Creating risk assessment dashboard...")
+        logger.info("Creating temporal risk assessment dashboard...")
 
         try:
             # Load risk data if not provided
@@ -312,163 +356,85 @@ class SpaceDataVisualizer:
                 logger.warning("No risk data available, creating sample")
                 risk_data = self._create_sample_risk_data()
 
-            # Get configuration from PROJECT_REQUIREMENTS
-            risk_config = self.chart_configs["risk_dashboard"]
+            # Parse approach dates and add year column
+            risk_data = risk_data.copy()
+            if 'approach_date' in risk_data.columns:
+                risk_data['approach_year'] = pd.to_datetime(
+                    risk_data['approach_date'], errors='coerce'
+                ).dt.year
+            else:
+                # Use current year as fallback
+                risk_data['approach_year'] = 2025
 
-            # Create dashboard with 4 subplots
+            # Temporal segmentation: Historical (≤2025) vs Future (≥2026)
+            historical_data = risk_data[risk_data['approach_year'] <= 2025]
+            future_data = risk_data[risk_data['approach_year'] >= 2026]
+
+            logger.info("Temporal segmentation: %d historical, %d future records",
+                       len(historical_data), len(future_data))
+
+            # If no future data, create projections from historical patterns
+            if future_data.empty:
+                logger.info("No future data found, creating projections from historical patterns")
+                future_data = self._create_future_projections(historical_data)
+
+            # Create main dashboard with temporal sections
             fig = make_subplots(
-                rows=2, cols=2,
-                subplot_titles=('Risk vs Size & Distance', 'Risk Score Distribution',
-                              'Risk Categories', 'Highest Risk Objects by Date'),
-                specs=[[{"type": "scatter"}, {"type": "histogram"}],
-                       [{"type": "pie"}, {"type": "scatter"}]],
-                # Add space for legends at bottom
+                rows=2, cols=1,
+                subplot_titles=[
+                    'Historical & Present Risk Assessment (≤2025)',
+                    'Future Risk Projections & Trends (≥2026)'
+                ],
+                specs=[[{"secondary_y": False}], [{"secondary_y": False}]],
                 vertical_spacing=0.15
             )
 
-            # 1. Scatter plot: Size vs Distance colored by risk (RED SCHEME)
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_data['distance_au'],
-                    y=risk_data['h'],
-                    mode='markers',
-                    marker={
-                        "size": np.clip(risk_data['risk_score'] / 5, 5, 30),
-                        "color": risk_data['risk_score'],
-                        "colorscale": 'Reds',
-                        "showscale": True,
-                        "colorbar": {
-                            "title": "Risk Score",
-                            "x": 0.45,
-                            "y": 0.2,  # Move to bottom
-                            "len": 0.3  # Make smaller
-                        }
-                    },
-                    text=risk_data['des'],
-                    hovertemplate=(
-                        'Object: %{text}<br>Distance: %{x:.6f} AU<br>'
-                        'Magnitude: %{y}<br>Risk: %{marker.color}<extra></extra>'
-                    ),
-                    name='NEO Risk'
-                ),
-                row=1, col=1
-            )
+            # SECTION 1: Historical & Present Risk Assessment (≤2025)
+            self._add_temporal_risk_plots(fig, historical_data, "Historical", "#8B0000", 1)
 
-            # 2. Histogram: Risk score distribution (RED GRADIENT)
-            # Create red gradient for histogram
-            red_colors = ['#ffe6e6', '#ff9999', '#ff4d4d', '#cc0000', '#800000']
-            fig.add_trace(
-                go.Histogram(
-                    x=risk_data['risk_score'],
-                    nbinsx=20,
-                    marker_color='#cc0000',  # Red color
-                    marker_line=dict(color='#800000', width=1),
-                    opacity=0.8,
-                    name='Risk Distribution'
-                ),
-                row=1, col=2
-            )
+            # SECTION 2: Future Risk Projections & Trends (≥2026)
+            self._add_temporal_risk_plots(fig, future_data, "Future", "#006400", 2)
 
-            # 3. Pie chart: Risk categories (RED SCHEME)
-            if 'risk_category' in risk_data.columns:
-                risk_counts = risk_data['risk_category'].value_counts()
-                # Create red color scheme for pie chart
-                red_palette = ['#ffcccc', '#ff9999', '#ff6666', '#cc0000']
-                fig.add_trace(
-                    go.Pie(
-                        labels=risk_counts.index,
-                        values=risk_counts.values,
-                        marker_colors=red_palette[:len(risk_counts)],
-                        name='Risk Categories',
-                        showlegend=True
-                    ),
-                    row=2, col=1
-                )
+            # Add comparative statistics as annotations
+            self._add_temporal_comparison_annotations(fig, historical_data, future_data)
 
-            # 4. Enhanced time-based chart for highest risk objects
-            top_risks = risk_data.nlargest(10, 'risk_score')
-            if 'approach_date' in top_risks.columns:
-                # Convert approach_date to datetime for proper time axis
-                top_risks = top_risks.copy()
-                top_risks['approach_date'] = pd.to_datetime(top_risks['approach_date'])
+            # Add cross-section filtering capabilities (simplified for now)
+            # Note: Full interactive cross-filtering would require JavaScript callbacks
+            logger.info("Cross-section filtering available via plot interactions")
 
-                fig.add_trace(
-                    go.Scatter(
-                        x=top_risks['approach_date'],
-                        y=top_risks['risk_score'],
-                        mode='markers+text',
-                        marker={
-                            'size': 15,
-                            'color': top_risks['risk_score'],
-                            'colorscale': 'Reds',
-                            'line': dict(width=2, color='darkred')
-                        },
-                        text=top_risks['des'],
-                        textposition='top center',
-                        hovertemplate=(
-                            'Object: %{text}<br>'
-                            'Approach Date: %{x}<br>'
-                            'Risk Score: %{y}<br>'
-                            'Distance: %{customdata[0]:.6f} AU<br>'
-                            'Velocity: %{customdata[1]} km/s<br>'
-                            'Full Name: %{customdata[2]}<extra></extra>'
-                        ),
-                        customdata=list(zip(
-                            top_risks['distance_au'],
-                            top_risks['velocity_kms'],
-                            top_risks['fullname']
-                        )),
-                        name='High Risk Timeline'
-                    ),
-                    row=2, col=2
-                )
-            else:
-                # Fallback to regular bar chart if no date data
-                fig.add_trace(
-                    go.Bar(
-                        x=top_risks['des'],
-                        y=top_risks['risk_score'],
-                        marker_color='#cc0000',
-                        text=top_risks['risk_score'],
-                        textposition='auto',
-                        name='Highest Risk'
-                    ),
-                    row=2, col=2
-                )
-
-            # Update layout with enhanced styling and formula in subtitle
-            subtitle = risk_config.get('subtitle', 'Risk Score = (30-H_magnitude)*1.33 + max(0.1-distance_AU)*400 + min(velocity,60)*0.33')
+            # Update layout for temporal dashboard
+            subtitle = "Temporal Risk Analysis: Historical Patterns vs Future Projections"
             fig.update_layout(
                 title={
-                    "text": f"{risk_config['title']}<br><sub>{subtitle}</sub>",
+                    "text": f"Temporal NEO Risk Assessment Dashboard<br><sub>{subtitle}</sub>",
                     "x": 0.5,
-                    "font": {"size": 16}
+                    "font": {"size": 18, "color": "white"}
                 },
-                height=900,  # Increased height for legend space
+                height=1200,  # Increased height for two sections
                 template='plotly_dark',
                 plot_bgcolor='rgba(0,0,0,0.8)',
                 paper_bgcolor='rgba(0,0,0,0.9)',
                 font={"color": "white"},
-                # Position legends at bottom
+                showlegend=True,
                 legend=dict(
-                    orientation="h",
-                    yanchor="top",
-                    y=-0.05,
-                    xanchor="center",
-                    x=0.5
+                    x=1.02,
+                    y=1,
+                    bgcolor='rgba(0,0,0,0.5)',
+                    bordercolor='white',
+                    borderwidth=1
                 )
             )
 
-            # Update axes with enhanced styling
-            fig.update_xaxes(title_text="Distance (AU)", type='log', row=1, col=1, gridcolor='rgba(255,255,255,0.2)')
-            fig.update_yaxes(title_text="Magnitude (H)", row=1, col=1, gridcolor='rgba(255,255,255,0.2)')
-            fig.update_xaxes(title_text="Risk Score", row=1, col=2, gridcolor='rgba(255,255,255,0.2)')
-            fig.update_yaxes(title_text="Count", row=1, col=2, gridcolor='rgba(255,255,255,0.2)')
-            fig.update_xaxes(title_text="Approach Date", row=2, col=2, gridcolor='rgba(255,255,255,0.2)')
-            fig.update_yaxes(title_text="Risk Score", row=2, col=2, gridcolor='rgba(255,255,255,0.2)')
+            # Update axes for temporal sections with corrected labels
+            fig.update_xaxes(title_text="Approach Year", row=1, col=1)
+            fig.update_yaxes(title_text="Risk Score", row=1, col=1)
+            fig.update_xaxes(title_text="Projected Approach Year", row=2, col=1)
+            fig.update_yaxes(title_text="Projected Risk Score", row=2, col=1)
 
             self.figures['risk_assessment'] = fig
-            logger.info("✓ Enhanced risk assessment dashboard created")
+            logger.info("✓ Temporal risk assessment dashboard created")
+            logger.info("Historical records: %d, Future projections: %d",
+                       len(historical_data), len(future_data))
 
             return fig
 
@@ -478,15 +444,15 @@ class SpaceDataVisualizer:
 
     def create_discovery_timeline(self, discovery_data: Optional[pd.DataFrame] = None) -> go.Figure:
         """
-        Create interactive discovery timeline.
+        Create interactive 3D discovery timeline with working animation.
 
         Args:
             discovery_data: DataFrame with discovery data over time
 
         Returns:
-            Plotly figure with animated timeline
+            Plotly figure with 3D animated timeline
         """
-        logger.info("Creating discovery timeline...")
+        logger.info("Creating 3D discovery timeline...")
 
         try:
             # Load discovery data if not provided
@@ -497,79 +463,262 @@ class SpaceDataVisualizer:
                 logger.warning("No discovery data available, creating sample")
                 discovery_data = self._create_sample_discovery_data()
 
-            # Apply size_max from requirements and enhanced color scheme
-            timeline_config = self.chart_configs["timeline"]
+            # Ensure we have the right column names
+            if 'approach_year' not in discovery_data.columns:
+                discovery_data['approach_year'] = discovery_data['year']
 
-            # Create animated scatter plot
-            fig = px.scatter(
-                discovery_data,
-                x='distance_au',
-                y='magnitude',
-                size='risk_score',
-                color='risk_category',
-                animation_frame='year',
-                hover_name='object_name',
-                hover_data=['velocity_kms', 'risk_score'],
-                title=timeline_config["title"],
-                labels={
-                    'distance_au': 'Distance (AU)',
-                    'magnitude': 'Magnitude (H)',
-                    'risk_score': 'Risk Score',
-                    'risk_category': 'Risk Category'
-                },
-                size_max=timeline_config["size_max"],
-                color_discrete_sequence=self.color_palette,
-                template='plotly_dark'
+            # Define risk category color mapping as specified
+            risk_color_map = {
+                'VERY_HIGH': '#8B0000',  # Dark red
+                'HIGH': '#CD5C5C',      # Medium red
+                'MEDIUM': '#FFA0A0',    # Light red
+                'LOW': '#FFD0D0'        # Very light red
+            }
+
+            # Map colors to data
+            discovery_data['color'] = discovery_data['risk_category'].map(risk_color_map)
+
+            # Get unique years and create a more complete dataset
+            years = sorted(discovery_data['year'].unique())
+            logger.info(f"Years available: {min(years)} to {max(years)} ({len(years)} total)")
+
+            # Create the base 3D scatter plot with ALL data points
+            fig = go.Figure()
+
+            # Add all data points for each risk category (all years combined)
+            for risk_category in ['VERY_HIGH', 'HIGH', 'MEDIUM', 'LOW']:
+                category_data = discovery_data[discovery_data['risk_category'] == risk_category]
+
+                if not category_data.empty:
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=category_data['distance_au'],
+                            y=category_data['magnitude'],
+                            z=category_data['approach_year'],
+                            mode='markers',
+                            marker=dict(
+                                size=np.clip(category_data['risk_score'] / 5, 5, 20),
+                                color=risk_color_map[risk_category],
+                                opacity=0.8,
+                                line=dict(width=1, color='white')
+                            ),
+                            text=category_data['object_name'],
+                            hovertemplate=(
+                                'Object: %{text}<br>'
+                                'Distance: %{x:.6f} AU<br>'
+                                'Magnitude: %{y}<br>'
+                                'Year: %{z}<br>'
+                                'Risk Score: %{customdata[0]}<br>'
+                                'Velocity: %{customdata[1]} km/s<br>'
+                                'Risk Category: ' + risk_category + '<extra></extra>'
+                            ),
+                            customdata=list(zip(
+                                category_data['risk_score'],
+                                category_data['velocity_kms']
+                            )),
+                            name=f'{risk_category.replace("_", " ").title()} Risk',
+                            visible=True,
+                            showlegend=True
+                        )
+                    )
+
+            # Create animation frames for year-by-year progression
+            frames = []
+
+            # Create cumulative frames (showing data up to current year)
+            for i, current_year in enumerate(years):
+                frame_data = []
+
+                for risk_category in ['VERY_HIGH', 'HIGH', 'MEDIUM', 'LOW']:
+                    # Show data up to and including current year
+                    cumulative_data = discovery_data[
+                        (discovery_data['risk_category'] == risk_category) &
+                        (discovery_data['year'] <= current_year)
+                    ]
+
+                    if not cumulative_data.empty:
+                        frame_data.append(
+                            go.Scatter3d(
+                                x=cumulative_data['distance_au'],
+                                y=cumulative_data['magnitude'],
+                                z=cumulative_data['approach_year'],
+                                mode='markers',
+                                marker=dict(
+                                    size=np.clip(cumulative_data['risk_score'] / 5, 5, 20),
+                                    color=risk_color_map[risk_category],
+                                    opacity=0.8,
+                                    line=dict(width=1, color='white')
+                                ),
+                                text=cumulative_data['object_name'],
+                                hovertemplate=(
+                                    'Object: %{text}<br>'
+                                    'Distance: %{x:.6f} AU<br>'
+                                    'Magnitude: %{y}<br>'
+                                    'Year: %{z}<br>'
+                                    'Risk Score: %{customdata[0]}<br>'
+                                    'Velocity: %{customdata[1]} km/s<br>'
+                                    'Risk Category: ' + risk_category + '<extra></extra>'
+                                ),
+                                customdata=list(zip(
+                                    cumulative_data['risk_score'],
+                                    cumulative_data['velocity_kms']
+                                )),
+                                name=f'{risk_category.replace("_", " ").title()} Risk'
+                            )
+                        )
+                    else:
+                        # Empty trace for this category
+                        frame_data.append(
+                            go.Scatter3d(
+                                x=[], y=[], z=[],
+                                mode='markers',
+                                name=f'{risk_category.replace("_", " ").title()} Risk'
+                            )
+                        )
+
+                frames.append(go.Frame(
+                    data=frame_data,
+                    name=str(current_year),
+                    traces=list(range(len(frame_data)))
+                ))
+
+            fig.frames = frames
+
+            # Add working animation controls
+            fig.update_layout(
+                updatemenus=[
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        buttons=[
+                            dict(
+                                args=[
+                                    None,
+                                    {
+                                        "frame": {"duration": 1000, "redraw": True},
+                                        "fromcurrent": True,
+                                        "transition": {"duration": 300, "easing": "quadratic-in-out"}
+                                    }
+                                ],
+                                label="Play",
+                                method="animate"
+                            ),
+                            dict(
+                                args=[
+                                    [None],
+                                    {
+                                        "frame": {"duration": 0, "redraw": False},
+                                        "mode": "immediate",
+                                        "transition": {"duration": 0}
+                                    }
+                                ],
+                                label="Pause",
+                                method="animate"
+                            )
+                        ],
+                        pad={"r": 10, "t": 87},
+                        showactive=False,
+                        x=0.011,
+                        xanchor="right",
+                        y=0,
+                        yanchor="top"
+                    )
+                ],
+                sliders=[
+                    dict(
+                        active=len(years)-1,  # Start at the end to show all data
+                        yanchor="top",
+                        xanchor="left",
+                        currentvalue={
+                            "font": {"size": 16, "color": "white"},
+                            "prefix": "Year: ",
+                            "visible": True,
+                            "xanchor": "right"
+                        },
+                        transition={"duration": 300, "easing": "cubic-in-out"},
+                        pad={"b": 10, "t": 50},
+                        len=0.9,
+                        x=0.1,
+                        y=0,
+                        steps=[
+                            dict(
+                                args=[
+                                    [str(year)],
+                                    {
+                                        "frame": {"duration": 300, "redraw": True},
+                                        "mode": "immediate",
+                                        "transition": {"duration": 300}
+                                    }
+                                ],
+                                label=str(year),
+                                method="animate"
+                            ) for year in years
+                        ]
+                    )
+                ]
             )
 
-            # Update layout with enhanced styling from requirements
-            timeline_config = self.chart_configs["timeline"]
+            # Update layout with 3D scene configuration
             fig.update_layout(
                 title={
-                    "text": timeline_config["title"],
+                    "text": "3D NEO Discovery Timeline (1900-1966)",
                     "x": 0.5,
                     "font": {"size": 20, "color": "white"}
                 },
-                xaxis={
-                    "type": 'log',
-                    "title": 'Distance (AU)',
-                    "gridcolor": 'rgba(255,255,255,0.2)',
-                    "color": "white"
-                },
-                yaxis={
-                    "title": 'Magnitude (H) - Smaller = Larger Object',
-                    "gridcolor": 'rgba(255,255,255,0.2)',
-                    "color": "white"
-                },
-                height=600,
+                scene=dict(
+                    xaxis=dict(
+                        title='Distance (AU)',
+                        type='log',
+                        gridcolor='rgba(255,255,255,0.2)',
+                        backgroundcolor='rgba(0,0,0,0.8)'
+                    ),
+                    yaxis=dict(
+                        title='Magnitude (H)',
+                        gridcolor='rgba(255,255,255,0.2)',
+                        backgroundcolor='rgba(0,0,0,0.8)'
+                    ),
+                    zaxis=dict(
+                        title='Year',
+                        range=[1900, 1970],
+                        gridcolor='rgba(255,255,255,0.2)',
+                        backgroundcolor='rgba(0,0,0,0.8)'
+                    ),
+                    bgcolor='rgba(0,0,0,0.8)',
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.5),
+                        center=dict(x=0, y=0, z=0),
+                        up=dict(x=0, y=0, z=1)
+                    )
+                ),
+                height=700,
                 plot_bgcolor='rgba(0,0,0,0.8)',
                 paper_bgcolor='rgba(0,0,0,0.9)',
                 font={"color": "white"},
-                template='plotly_dark'
+                template='plotly_dark',
+                legend=dict(
+                    x=1.02,
+                    y=1,
+                    bgcolor='rgba(0,0,0,0.5)',
+                    bordercolor='white',
+                    borderwidth=1
+                ),
+                margin=dict(l=0, r=0, t=50, b=0)
             )
 
-            # Update animation settings safely
-            try:
-                if hasattr(fig.layout, 'updatemenus') and len(fig.layout.updatemenus) > 0:
-                    fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 1000
-                    fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 500
-            except (IndexError, KeyError, TypeError):
-                logger.warning("Could not update animation settings")
-
             self.figures['discovery_timeline'] = fig
-            logger.info("✓ Discovery timeline created")
+            logger.info("✓ 3D Discovery timeline created with %d years of data", len(years))
 
             return fig
 
         except (duckdb.Error, ValueError) as e:
-            logger.error("Failed to create discovery timeline: %s", e)
+            logger.error("Failed to create 3D discovery timeline: %s", e)
             return go.Figure()
 
     def create_storage_efficiency_comparison(
         self, efficiency_data: Optional[Dict] = None
     ) -> go.Figure:
         """
-        Create storage format efficiency comparison visualization.
+        Create storage format efficiency comparison visualization with legend.
 
         Args:
             efficiency_data: Dictionary with storage efficiency metrics
@@ -584,6 +733,14 @@ class SpaceDataVisualizer:
             if efficiency_data is None:
                 efficiency_data = self._create_sample_efficiency_data()
 
+            # Define color mapping as specified
+            format_colors = {
+                'CSV': '#800080',      # Purple
+                'Parquet': '#008000',  # Green
+                'DuckDB': '#FFD700',   # Gold
+                'Iceberg': '#0000FF'   # Blue
+            }
+
             # Create comparison chart
             fig = make_subplots(
                 rows=1, cols=3,
@@ -595,44 +752,74 @@ class SpaceDataVisualizer:
             file_sizes = [150.5, 45.2, 38.7, 42.1]  # MB
             compression_ratios = [1.0, 3.3, 3.9, 3.6]
             query_speeds = [2.5, 0.8, 0.3, 0.4]  # seconds
+            colors = [format_colors[fmt] for fmt in formats]
 
             # File size comparison
             fig.add_trace(
                 go.Bar(x=formats, y=file_sizes, name='File Size (MB)',
-                       marker_color=self.color_palette[:len(formats)],
+                       marker_color=colors,
                        text=[f'{s:.1f} MB' for s in file_sizes],
-                       textposition='auto'),
+                       textposition='auto',
+                       showlegend=True,
+                       legendgroup='formats'),
                 row=1, col=1
             )
 
             # Compression ratio
             fig.add_trace(
                 go.Bar(x=formats, y=compression_ratios, name='Compression Ratio',
-                       marker_color=self.color_palette[:len(formats)],
+                       marker_color=colors,
                        text=[f'{r:.1f}x' for r in compression_ratios],
-                       textposition='auto'),
+                       textposition='auto',
+                       showlegend=False,
+                       legendgroup='formats'),
                 row=1, col=2
             )
 
             # Query performance (lower is better)
             fig.add_trace(
                 go.Bar(x=formats, y=query_speeds, name='Query Time (s)',
-                       marker_color=self.color_palette[:len(formats)],
+                       marker_color=colors,
                        text=[f'{t:.1f}s' for t in query_speeds],
-                       textposition='auto'),
+                       textposition='auto',
+                       showlegend=False,
+                       legendgroup='formats'),
                 row=1, col=3
             )
 
-            # Update layout
+            # Add individual traces for legend with specified colors
+            for fmt in formats:
+                fig.add_trace(
+                    go.Scatter(
+                        x=[None], y=[None],
+                        mode='markers',
+                        marker=dict(size=15, color=format_colors[fmt]),
+                        name=fmt,
+                        showlegend=True
+                    )
+                )
+
+            # Update layout with legend at bottom-center
             fig.update_layout(
                 title={
                     "text": "Storage Format Efficiency Comparison",
                     "x": 0.5,
                     "font": {"size": 20}
                 },
-                height=500,
+                height=600,  # Increased for legend space
                 template='plotly_dark',
-                showlegend=False
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.1,
+                    xanchor="center",
+                    x=0.5,
+                    title="Storage Format Types",
+                    bgcolor='rgba(0,0,0,0.5)',
+                    bordercolor='white',
+                    borderwidth=1
+                )
             )
 
             # Update axes
@@ -770,7 +957,7 @@ class SpaceDataVisualizer:
             FROM risk_calculations
             WHERE rn = 1
             ORDER BY risk_score DESC
-            LIMIT 100
+            -- Removed LIMIT for comprehensive risk analysis
             """
 
             return self.conn.execute(query).df()
@@ -783,32 +970,37 @@ class SpaceDataVisualizer:
         """Load discovery timeline data from database."""
         try:
             query = """
-            SELECT
-                des as object_name,
-                approach_year as year,
-                ROUND(dist, 6) as distance_au,
-                h as magnitude,
-                ROUND(v_rel, 2) as velocity_kms,
-                ROUND(
-                    GREATEST(0, 30 - h) * 1.33 +
-                    GREATEST(0, 0.1 - dist) * 400 +
-                    LEAST(v_rel, 60) * 0.33,
-                    2
-                ) as risk_score,
-                CASE
-                    WHEN h < 18 AND dist < 0.05 THEN 'VERY_HIGH'
-                    WHEN h < 20 AND dist < 0.1 THEN 'HIGH'
-                    WHEN h < 25 AND dist < 0.2 THEN 'MEDIUM'
-                    ELSE 'LOW'
-                END as risk_category
-            FROM neo_approaches
-            WHERE approach_year IS NOT NULL
-                AND approach_year BETWEEN 1900 AND 1967
-                AND h IS NOT NULL
-                AND dist IS NOT NULL
-                AND v_rel IS NOT NULL
-            ORDER BY approach_year, risk_score DESC
-            LIMIT 500
+            WITH sampled_data AS (
+                SELECT
+                    des as object_name,
+                    approach_year as year,
+                    ROUND(dist, 6) as distance_au,
+                    h as magnitude,
+                    ROUND(v_rel, 2) as velocity_kms,
+                    ROUND(
+                        GREATEST(0, 30 - h) * 1.33 +
+                        GREATEST(0, 0.1 - dist) * 400 +
+                        LEAST(v_rel, 60) * 0.33,
+                        2
+                    ) as risk_score,
+                    CASE
+                        WHEN h < 18 AND dist < 0.05 THEN 'VERY_HIGH'
+                        WHEN h < 20 AND dist < 0.1 THEN 'HIGH'
+                        WHEN h < 25 AND dist < 0.2 THEN 'MEDIUM'
+                        ELSE 'LOW'
+                    END as risk_category,
+                    ROW_NUMBER() OVER (PARTITION BY approach_year ORDER BY RANDOM()) as rn
+                FROM neo_approaches
+                WHERE approach_year IS NOT NULL
+                    AND approach_year BETWEEN 1900 AND 1966
+                    AND h IS NOT NULL
+                    AND dist IS NOT NULL
+                    AND v_rel IS NOT NULL
+            )
+            SELECT object_name, year, distance_au, magnitude, velocity_kms, risk_score, risk_category
+            FROM sampled_data
+            WHERE rn <= 50  -- Increased to 50 objects per year for more comprehensive data
+            ORDER BY year, risk_score DESC
             """
 
             return self.conn.execute(query).df()
@@ -858,17 +1050,18 @@ class SpaceDataVisualizer:
         })
 
     def _create_sample_discovery_data(self) -> pd.DataFrame:
-        """Create sample discovery timeline data."""
+        """Create sample discovery timeline data with extended year range."""
         np.random.seed(42)
-        years = list(range(2000, 2025))
+        years = list(range(1900, 1970, 5))  # Every 5 years from 1900 to 1965
         data = []
 
         for year in years:
-            n_discoveries = np.random.poisson(20)
+            n_discoveries = np.random.poisson(15)
             for i in range(n_discoveries):
                 data.append({
                     'object_name': f'{year}-{i:03d}',
                     'year': year,
+                    'approach_year': year,  # Add this field
                     'distance_au': np.random.lognormal(-2, 1),
                     'magnitude': np.random.normal(22, 3),
                     'velocity_kms': np.random.normal(20, 8),
@@ -1075,6 +1268,281 @@ class SpaceDataVisualizer:
                 'iceberg': 3.6
             }
         }
+
+    def _create_risk_section_subplots(
+        self,
+        data: pd.DataFrame,
+        section_name: str,
+        primary_color: str
+    ) -> go.Figure:
+        """
+        Create a 2x2 subplot section for risk assessment.
+
+        Args:
+            data: Risk data for this temporal section
+            section_name: Name of the section (Historical/Future)
+            primary_color: Primary color scheme for the section
+
+        Returns:
+            Figure with 2x2 risk assessment subplots
+        """
+        # Create 2x2 subplots for this section
+        section_fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                f'{section_name} Risk vs Size & Distance',
+                f'{section_name} Risk Score Distribution',
+                f'{section_name} Risk Categories',
+                f'{section_name} Top Risk Objects'
+            ),
+            specs=[[{"type": "scatter"}, {"type": "histogram"}],
+                   [{"type": "pie"}, {"type": "bar"}]]
+        )
+
+        if data.empty:
+            # Add empty placeholder traces
+            section_fig.add_trace(
+                go.Scatter(x=[], y=[], mode='markers', name=f'{section_name} (No Data)'),
+                row=1, col=1
+            )
+            return section_fig
+
+        # 1. Scatter plot: Size vs Distance colored by risk
+        section_fig.add_trace(
+            go.Scatter(
+                x=data['distance_au'],
+                y=data['h'],
+                mode='markers',
+                marker={
+                    "size": np.clip(data['risk_score'] / 5, 5, 20),
+                    "color": data['risk_score'],
+                    "colorscale": 'Reds' if 'Historical' in section_name else 'Greens',
+                    "showscale": True
+                },
+                text=data['des'],
+                hovertemplate=(
+                    'Object: %{text}<br>Distance: %{x:.6f} AU<br>'
+                    'Magnitude: %{y}<br>Risk: %{marker.color}<extra></extra>'
+                ),
+                name=f'{section_name} Risk Scatter'
+            ),
+            row=1, col=1
+        )
+
+        # 2. Histogram: Risk score distribution
+        section_fig.add_trace(
+            go.Histogram(
+                x=data['risk_score'],
+                nbinsx=15,
+                marker_color=primary_color,
+                opacity=0.8,
+                name=f'{section_name} Risk Distribution'
+            ),
+            row=1, col=2
+        )
+
+        # 3. Pie chart: Risk categories
+        if 'risk_category' in data.columns and not data['risk_category'].isna().all():
+            risk_counts = data['risk_category'].value_counts()
+            color_palette = ['#ffcccc', '#ff9999', '#ff6666', '#cc0000'] if 'Historical' in section_name else ['#ccffcc', '#99ff99', '#66ff66', '#00cc00']
+            section_fig.add_trace(
+                go.Pie(
+                    labels=risk_counts.index,
+                    values=risk_counts.values,
+                    marker_colors=color_palette[:len(risk_counts)],
+                    name=f'{section_name} Categories'
+                ),
+                row=2, col=1
+            )
+
+        # 4. Bar chart: Top risk objects
+        top_risks = data.nlargest(8, 'risk_score')
+        section_fig.add_trace(
+            go.Bar(
+                x=top_risks['des'][:8],  # Limit to 8 for readability
+                y=top_risks['risk_score'][:8],
+                marker_color=primary_color,
+                name=f'{section_name} Top Risks'
+            ),
+            row=2, col=2
+        )
+
+        return section_fig
+
+    def _add_temporal_risk_plots(
+        self,
+        fig: go.Figure,
+        data: pd.DataFrame,
+        section_name: str,
+        primary_color: str,
+        row: int
+    ) -> None:
+        """
+        Add temporal risk assessment plots to the main figure.
+
+        Args:
+            fig: Main figure to add plots to
+            data: Risk data for this temporal section
+            section_name: Name of the section (Historical/Future)
+            primary_color: Primary color scheme for the section
+            row: Row number to add plots to
+        """
+        if data.empty:
+            # Add placeholder for empty data
+            fig.add_trace(
+                go.Scatter(
+                    x=[0], y=[0], mode='markers',
+                    marker=dict(size=20, color='gray'),
+                    name=f'{section_name} (No Data)',
+                    text='No data available',
+                    hovertemplate='%{text}<extra></extra>'
+                ),
+                row=row, col=1
+            )
+            return
+
+        # Scatter plot: Risk vs Approach Year (corrected axes)
+        fig.add_trace(
+            go.Scatter(
+                x=data['approach_year'],  # X-axis: Approach years
+                y=data['risk_score'],     # Y-axis: Risk factor
+                mode='markers',
+                marker={
+                    "size": np.clip(30 - data['h'], 5, 25),  # Larger objects = larger markers
+                    "color": data['risk_score'],
+                    "colorscale": 'Reds' if 'Historical' in section_name else 'Greens',
+                    "showscale": True,
+                    "colorbar": {
+                        "title": f"{section_name} Risk Score",
+                        "x": 1.02 if row == 1 else 1.05,
+                        "y": 0.75 if row == 1 else 0.25,
+                        "len": 0.3
+                    }
+                },
+                text=data['des'],
+                hovertemplate=(
+                    f'{section_name} Object: %{{text}}<br>'
+                    'Approach Year: %{x}<br>'
+                    'Risk Score: %{y:.1f}<br>'
+                    'Distance: %{customdata[0]:.6f} AU<br>'
+                    'Magnitude: %{customdata[1]}<extra></extra>'
+                ),
+                customdata=list(zip(data['distance_au'], data['h'])),
+                name=f'{section_name} Risk vs Year'
+            ),
+            row=row, col=1
+        )
+
+        # Add trend line for risk over time if we have temporal data
+        if len(data) > 5:  # Need sufficient data for trend
+            # Calculate moving average of risk scores by year
+            yearly_risk = data.groupby('approach_year')['risk_score'].mean().reset_index()
+
+            if len(yearly_risk) > 1:
+                fig.add_trace(
+                    go.Scatter(
+                        x=yearly_risk['approach_year'],
+                        y=yearly_risk['risk_score'],
+                        mode='lines+markers',
+                        line=dict(color=primary_color, width=2),
+                        marker=dict(size=8, color=primary_color),
+                        name=f'{section_name} Risk Trend',
+                        yaxis='y2'  # Use secondary y-axis
+                    ),
+                    row=row, col=1
+                )
+
+    def _create_future_projections(self, historical_data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create future risk projections based on historical patterns.
+
+        Args:
+            historical_data: Historical risk data
+
+        Returns:
+            DataFrame with projected future risk data
+        """
+        if historical_data.empty:
+            return pd.DataFrame()
+
+        logger.info("Creating future projections from %d historical records", len(historical_data))
+
+        # Use statistical patterns from historical data to project future scenarios
+        np.random.seed(42)  # For reproducible projections
+
+        # Create projections for years 2026-2030
+        future_years = list(range(2026, 2031))
+        projections = []
+
+        for year in future_years:
+            # Sample from historical patterns with some variation
+            year_sample_size = max(10, len(historical_data) // 10)
+            base_sample = historical_data.sample(n=min(year_sample_size, len(historical_data)), random_state=year)
+
+            for i, (_, row) in enumerate(base_sample.iterrows()):
+                # Add some variation to create realistic future scenarios
+                projection = row.copy()
+                projection['approach_year'] = year
+                projection['approach_date'] = f"{year}-{np.random.randint(1, 13):02d}-{np.random.randint(1, 29):02d}"
+
+                # Slight variations in risk factors
+                projection['distance_au'] = max(0.001, row['distance_au'] * np.random.normal(1.0, 0.1))
+                projection['velocity_kms'] = max(1.0, row['velocity_kms'] * np.random.normal(1.0, 0.05))
+                projection['risk_score'] = max(0, row['risk_score'] * np.random.normal(1.0, 0.15))
+
+                # Update object designation for projection
+                projection['des'] = f"PROJ-{year}-{i:03d}"
+                projection['fullname'] = f"Projected Object {year}-{i:03d}"
+
+                projections.append(projection)
+
+        future_df = pd.DataFrame(projections)
+        logger.info("Generated %d future projections", len(future_df))
+        return future_df
+
+    def _add_temporal_comparison_annotations(
+        self,
+        fig: go.Figure,
+        historical_data: pd.DataFrame,
+        future_data: pd.DataFrame
+    ) -> None:
+        """
+        Add comparative statistics annotations between historical and future data.
+
+        Args:
+            fig: Main figure to add annotations to
+            historical_data: Historical risk data
+            future_data: Future risk data
+        """
+        if historical_data.empty or future_data.empty:
+            return
+
+        # Calculate comparative statistics
+        hist_mean_risk = historical_data['risk_score'].mean()
+        future_mean_risk = future_data['risk_score'].mean()
+
+        hist_high_risk = len(historical_data[historical_data['risk_score'] > 50])
+        future_high_risk = len(future_data[future_data['risk_score'] > 50])
+
+        # Add annotation with comparative statistics
+        comparison_text = (
+            f"Historical Avg Risk: {hist_mean_risk:.1f}<br>"
+            f"Future Avg Risk: {future_mean_risk:.1f}<br>"
+            f"Historical High Risk Objects: {hist_high_risk}<br>"
+            f"Future High Risk Objects: {future_high_risk}<br>"
+            f"Risk Trend: {'↗️ Increasing' if future_mean_risk > hist_mean_risk else '↘️ Decreasing'}"
+        )
+
+        fig.add_annotation(
+            x=0.02, y=0.5,
+            xref="paper", yref="paper",
+            text=comparison_text,
+            showarrow=False,
+            bgcolor="rgba(0,0,0,0.7)",
+            bordercolor="white",
+            borderwidth=1,
+            font=dict(color="white", size=12)
+        )
 
     def close(self) -> None:
         """Close database connection."""

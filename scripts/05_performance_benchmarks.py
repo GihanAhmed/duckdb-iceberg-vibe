@@ -9,9 +9,13 @@ This script benchmarks query performance across different storage formats
 import time
 import statistics
 import logging
+import psutil
+import gc
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import duckdb
+import pandas as pd
+import numpy as np
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +35,9 @@ class PerformanceBenchmarker:
         self.results = {}
         self.connections = {}
         self.efficiency_results = {}
+        self.memory_usage_history = []
+        self.large_dataset_threshold = 100000  # 100K records
+        self.memory_threshold_gb = 8.0  # 8GB memory threshold
         self._setup_connections()
 
     def _setup_connections(self) -> None:
@@ -60,16 +67,111 @@ class PerformanceBenchmarker:
             logger.error("Failed to setup connections: %s", e)
             raise
 
-    def benchmark_query(self, query: str, connection: duckdb.DuckDBPyConnection,
-                       iterations: int = 5, warmup: int = 1) -> Dict[str, float]:
+    def monitor_memory_usage(self) -> Dict[str, float]:
         """
-        Benchmark a single query multiple times.
+        Monitor current memory usage and store in history.
+
+        Returns:
+            Dictionary with memory statistics in GB
+        """
+        memory = psutil.virtual_memory()
+        memory_info = {
+            'timestamp': time.time(),
+            'total_gb': memory.total / (1024**3),
+            'used_gb': memory.used / (1024**3),
+            'available_gb': memory.available / (1024**3),
+            'percent_used': memory.percent
+        }
+
+        self.memory_usage_history.append(memory_info)
+        return memory_info
+
+    def check_large_dataset_requirements(self, record_count: int) -> Dict[str, Any]:
+        """
+        Check if dataset requires special handling for large datasets.
+
+        Args:
+            record_count: Number of records in dataset
+
+        Returns:
+            Dictionary with recommendations and thresholds
+        """
+        memory_info = self.monitor_memory_usage()
+
+        recommendations = {
+            'is_large_dataset': record_count > self.large_dataset_threshold,
+            'memory_warning': memory_info['used_gb'] > self.memory_threshold_gb,
+            'record_count': record_count,
+            'memory_used_gb': memory_info['used_gb'],
+            'recommendations': []
+        }
+
+        if recommendations['is_large_dataset']:
+            recommendations['recommendations'].append(
+                f"Large dataset detected ({record_count:,} records). Consider sampling strategies."
+            )
+
+        if recommendations['memory_warning']:
+            recommendations['recommendations'].append(
+                f"High memory usage ({memory_info['used_gb']:.1f} GB). "
+                "Consider chunked processing or data sampling."
+            )
+
+        if record_count > 500000:  # 500K+ records
+            recommendations['recommendations'].append(
+                "Very large dataset. Recommend implementing progressive loading and streaming queries."
+            )
+
+        return recommendations
+
+    def optimize_query_for_large_dataset(self, query: str, estimated_rows: int) -> str:
+        """
+        Optimize query for large datasets by adding limits and sampling.
+
+        Args:
+            query: Original SQL query
+            estimated_rows: Estimated number of rows the query will process
+
+        Returns:
+            Optimized query string
+        """
+        if estimated_rows <= self.large_dataset_threshold:
+            return query
+
+        logger.info("Optimizing query for large dataset (%s rows)", estimated_rows)
+
+        # Add LIMIT for very large result sets
+        if "LIMIT" not in query.upper() and estimated_rows > 1000000:
+            if "ORDER BY" in query.upper():
+                # Insert LIMIT before any existing ORDER BY
+                query = query.replace("ORDER BY", "LIMIT 1000000 ORDER BY")
+            else:
+                query += " LIMIT 1000000"
+
+        # Add sampling for aggregations on very large datasets
+        if estimated_rows > 2000000 and any(agg in query.upper() for agg in ["COUNT", "SUM", "AVG"]):
+            # Wrap query with sampling
+            query = f"SELECT * FROM ({query}) USING SAMPLE 10 PERCENT"
+
+        return query
+
+    def benchmark_query(
+        self,
+        query: str,
+        connection: duckdb.DuckDBPyConnection,
+        iterations: int = 5,
+        warmup: int = 1,
+        enable_large_dataset_optimizations: bool = True
+    ) -> Dict[str, float]:
+        """
+        Benchmark a single query multiple times with large dataset support.
 
         Args:
             query: SQL query to benchmark
             connection: DuckDB connection to use
             iterations: Number of timing iterations
             warmup: Number of warmup runs (not timed)
+            enable_large_dataset_optimizations: Enable optimizations for large datasets
 
         Returns:
             Dictionary with timing statistics

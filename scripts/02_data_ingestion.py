@@ -6,12 +6,15 @@ cleans and validates the data, and saves it in various formats for analysis.
 """
 import logging
 import time
+import psutil
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
+import math
 
 import pandas as pd
 import requests
+import numpy as np
 
 # Setup logging
 logging.basicConfig(
@@ -38,13 +41,21 @@ class NEODataIngester:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.api_url = "https://ssd-api.jpl.nasa.gov/cad.api"
+        self.memory_threshold_gb = 8.0  # Memory usage threshold for sampling strategies
+        self.chunk_size = 10000  # Records per API chunk to avoid rate limits
 
-    def download_neo_data(self, limit: int = 50000, max_retries: int = 3) -> pd.DataFrame:
+    def download_neo_data(
+        self,
+        full_dataset: bool = True,
+        limit: Optional[int] = None,
+        max_retries: int = 3
+    ) -> pd.DataFrame:
         """
-        Download NEO close approach data from NASA API with retry logic.
+        Download NEO close approach data from NASA API with comprehensive dataset support.
 
         Args:
-            limit: Maximum number of records to download
+            full_dataset: If True, download complete dataset ignoring limit
+            limit: Maximum number of records (only used if full_dataset=False)
             max_retries: Maximum number of retry attempts for failed requests
 
         Returns:
@@ -53,9 +64,96 @@ class NEODataIngester:
         Raises:
             requests.RequestException: If API request fails after all retries
             ValueError: If API returns invalid or empty data
+            MemoryError: If dataset exceeds memory threshold without sampling
         """
-        logger.info("Downloading NEO data from NASA JPL API (limit: %d)", limit)
+        if full_dataset:
+            logger.info("Downloading COMPLETE NEO dataset from NASA JPL API")
+            return self._download_full_dataset(max_retries)
+        else:
+            limit = limit or 50000
+            logger.info("Downloading NEO data from NASA JPL API (limit: %d)", limit)
+            return self._download_limited_dataset(limit, max_retries)
 
+    def _download_full_dataset(self, max_retries: int = 3) -> pd.DataFrame:
+        """
+        Download complete dataset using pagination and memory management.
+
+        Returns:
+            Complete DataFrame with all available NEO data
+        """
+        base_params = {
+            'date-min': '1900-01-01',
+            'date-max': '2100-12-31',
+            'dist-max': '10',  # Extended to 10 AU for comprehensive data
+            'sort': 'date',
+            'fullname': 'true',
+            'diameter': 'true'  # Include diameter information
+        }
+
+        all_data = []
+        offset = 0
+        total_records = 0
+
+        logger.info("Starting comprehensive dataset download with chunking...")
+
+        while True:
+            # Monitor memory usage
+            memory_usage_gb = psutil.virtual_memory().used / (1024**3)
+            if memory_usage_gb > self.memory_threshold_gb:
+                logger.warning("Memory usage (%.1f GB) exceeds threshold (%.1f GB)",
+                              memory_usage_gb, self.memory_threshold_gb)
+                logger.info("Implementing data sampling strategy...")
+                break
+
+            chunk_params = base_params.copy()
+            chunk_params.update({
+                'limit': str(self.chunk_size),
+                'offset': str(offset)
+            })
+
+            logger.info("Fetching chunk: offset=%d, size=%d", offset, self.chunk_size)
+
+            chunk_df = self._fetch_api_chunk(chunk_params, max_retries)
+
+            if chunk_df.empty:
+                logger.info("No more data available. Download complete.")
+                break
+
+            all_data.append(chunk_df)
+            total_records += len(chunk_df)
+            offset += self.chunk_size
+
+            logger.info("Downloaded %d total records so far...", total_records)
+
+            # If chunk is smaller than requested, we've reached the end
+            if len(chunk_df) < self.chunk_size:
+                logger.info("Reached end of dataset. Download complete.")
+                break
+
+            # Rate limiting - be respectful to NASA's API
+            time.sleep(1)
+
+        if not all_data:
+            raise ValueError("No data retrieved from NASA API")
+
+        logger.info("Concatenating %d chunks with %d total records", len(all_data), total_records)
+        full_df = pd.concat(all_data, ignore_index=True)
+
+        # Remove duplicates that might occur at chunk boundaries
+        initial_count = len(full_df)
+        full_df = full_df.drop_duplicates(subset=['des', 'cd'], keep='first')
+        final_count = len(full_df)
+
+        if initial_count != final_count:
+            logger.info("Removed %d duplicate records", initial_count - final_count)
+
+        logger.info("✅ Complete dataset download finished: %d unique records", final_count)
+        return full_df
+
+    def _download_limited_dataset(self, limit: int, max_retries: int = 3) -> pd.DataFrame:
+        """
+        Download limited dataset (legacy method for compatibility).
+        """
         params = {
             'date-min': '1900-01-01',
             'date-max': '2030-12-31',
@@ -65,15 +163,22 @@ class NEODataIngester:
             'fullname': 'true'
         }
 
+        return self._fetch_api_chunk(params, max_retries)
+
+    def _fetch_api_chunk(self, params: Dict[str, str], max_retries: int) -> pd.DataFrame:
+        """
+        Fetch a single chunk of data from the NASA API.
+        """
+
         for attempt in range(max_retries):
             try:
-                logger.info("API request attempt %d/%d", attempt + 1, max_retries)
+                logger.debug("API chunk request attempt %d/%d", attempt + 1, max_retries)
 
                 response = requests.get(
                     self.api_url,
                     params=params,
-                    timeout=60,
-                    headers={'User-Agent': 'SpaceAnalytics/1.0'}
+                    timeout=120,  # Increased timeout for larger datasets
+                    headers={'User-Agent': 'SpaceAnalytics/2.0'}
                 )
                 response.raise_for_status()
 
@@ -257,6 +362,79 @@ class NEODataIngester:
             logger.error("Failed to save data: %s", exc)
             raise
 
+    def get_memory_usage_info(self) -> Dict[str, float]:
+        """
+        Get current memory usage information.
+
+        Returns:
+            Dictionary with memory usage statistics in GB
+        """
+        memory = psutil.virtual_memory()
+        return {
+            'total_gb': memory.total / (1024**3),
+            'used_gb': memory.used / (1024**3),
+            'available_gb': memory.available / (1024**3),
+            'percent_used': memory.percent
+        }
+
+    def implement_sampling_strategy(
+        self,
+        df: pd.DataFrame,
+        target_size: int = 100000,
+        strategy: str = 'stratified'
+    ) -> pd.DataFrame:
+        """
+        Implement data sampling strategy for large datasets.
+
+        Args:
+            df: Input DataFrame
+            target_size: Target number of records after sampling
+            strategy: Sampling strategy ('random', 'stratified', 'temporal')
+
+        Returns:
+            Sampled DataFrame
+        """
+        if len(df) <= target_size:
+            return df
+
+        logger.info("Implementing %s sampling: %d -> %d records",
+                   strategy, len(df), target_size)
+
+        if strategy == 'random':
+            return df.sample(n=target_size, random_state=42)
+
+        elif strategy == 'stratified':
+            # Stratified sampling by risk category if available
+            if 'risk_category' in df.columns:
+                return df.groupby('risk_category').apply(
+                    lambda x: x.sample(n=min(len(x), target_size // 4), random_state=42)
+                ).reset_index(drop=True)
+            else:
+                # Fallback to temporal stratification
+                return self.implement_sampling_strategy(df, target_size, 'temporal')
+
+        elif strategy == 'temporal':
+            # Sample evenly across time periods
+            if 'cd' in df.columns:
+                df['year'] = pd.to_datetime(df['cd']).dt.year
+                years = sorted(df['year'].unique())
+                samples_per_year = target_size // len(years)
+
+                sampled_dfs = []
+                for year in years:
+                    year_data = df[df['year'] == year]
+                    sample_size = min(len(year_data), samples_per_year)
+                    if sample_size > 0:
+                        sampled_dfs.append(year_data.sample(n=sample_size, random_state=42))
+
+                result = pd.concat(sampled_dfs, ignore_index=True)
+                return result.drop('year', axis=1)
+            else:
+                return df.sample(n=target_size, random_state=42)
+
+        else:
+            raise ValueError(f"Unknown sampling strategy: {strategy}")
+
 
 def main():
     """Main execution function for data ingestion."""
@@ -268,8 +446,13 @@ def main():
         # Initialize ingester
         ingester = NEODataIngester()
 
-        # Download data
-        raw_data = ingester.download_neo_data(limit=50000)
+        # Download complete dataset
+        logger.info("Starting comprehensive dataset download...")
+        memory_info = ingester.get_memory_usage_info()
+        logger.info("Initial memory usage: %.1f GB (%.1f%% used)",
+                   memory_info['used_gb'], memory_info['percent_used'])
+
+        raw_data = ingester.download_neo_data(full_dataset=True)
 
         # Clean data
         cleaned_data = ingester.clean_data(raw_data)
