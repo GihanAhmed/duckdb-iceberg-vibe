@@ -30,6 +30,7 @@ class PerformanceBenchmarker:
         """Initialize the performance benchmarker."""
         self.results = {}
         self.connections = {}
+        self.efficiency_results = {}
         self._setup_connections()
 
     def _setup_connections(self) -> None:
@@ -52,8 +53,8 @@ class PerformanceBenchmarker:
                     try:
                         conn.execute(f"INSTALL {ext}")
                         conn.execute(f"LOAD {ext}")
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning("Failed to install/load extension %s: %s", ext, e)
 
         except Exception as e:
             logger.error("Failed to setup connections: %s", e)
@@ -206,33 +207,20 @@ class PerformanceBenchmarker:
         else:
             configs['duckdb_table'] = {'available': False}
 
-        # Iceberg format (simulated via partitioned parquet)
-        iceberg_path = Path("data/iceberg_warehouse/neo_approaches_iceberg")
-        if iceberg_path.exists():
-            # Look for partitioned data
-            partition_dirs = list(iceberg_path.glob("approach_year=*"))
-            if partition_dirs:
-                # Create union query for partitioned access
-                parquet_files = []
-                for partition_dir in partition_dirs:
-                    parquet_files.extend(partition_dir.glob("*.parquet"))
-
-                if parquet_files:
-                    union_parts = [f"SELECT * FROM '{f}'" for f in parquet_files[:5]]  # Limit for demo
-                    union_query = " UNION ALL ".join(union_parts)
-
-                    configs['iceberg'] = {
-                        'available': True,
-                        'connection': self.connections['memory'],
-                        'table_ref': f"({union_query})",
-                        'setup_queries': [
-                            f"CREATE OR REPLACE VIEW iceberg_neo AS {union_query}"
-                        ]
-                    }
-                    # Update table ref to use the view
-                    configs['iceberg']['table_ref'] = 'iceberg_neo'
-                else:
-                    configs['iceberg'] = {'available': False}
+        # Iceberg format (true Iceberg tables)
+        iceberg_data_path = Path("data/iceberg_warehouse/demo.db/neo_approaches_iceberg/data")
+        if iceberg_data_path.exists():
+            # Find the parquet files in Iceberg data directory
+            parquet_files = list(iceberg_data_path.glob("*.parquet"))
+            if parquet_files:
+                # Use the Iceberg data files directly
+                iceberg_file = str(parquet_files[0])  # Use first file (we only have one)
+                configs['iceberg'] = {
+                    'available': True,
+                    'connection': self.connections['memory'],
+                    'table_ref': f"'{iceberg_file}'",
+                    'file_path': iceberg_file
+                }
             else:
                 configs['iceberg'] = {'available': False}
         else:
@@ -431,7 +419,7 @@ class PerformanceBenchmarker:
             report_content = "\n".join(report_lines)
             report_file = Path("performance_report.md")
 
-            with open(report_file, 'w') as f:
+            with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report_content)
 
             logger.info("✓ Performance report saved to %s", report_file)
@@ -447,8 +435,8 @@ class PerformanceBenchmarker:
             try:
                 conn.close()
                 logger.debug("✓ Closed %s connection", name)
-            except:
-                pass
+            except Exception as e:
+                logger.warning("Failed to close %s connection: %s", name, e)
 
         logger.info("✓ All benchmark connections closed")
 

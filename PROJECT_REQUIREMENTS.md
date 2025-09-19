@@ -20,7 +20,7 @@
 ```txt
 duckdb>=0.9.0
 pandas>=2.0.0
-pyiceberg>=0.5.0
+pyiceberg[duckdb]>=0.7.0
 boto3>=1.26.0
 matplotlib>=3.6.0
 plotly>=5.15.0
@@ -44,7 +44,7 @@ space-analytics-demo/
 │   ├── 01_setup_environment.py
 │   ├── 02_data_ingestion.py
 │   ├── 03_duckdb_setup.py
-│   ├── 04_iceberg_conversion.py
+│   ├── 04_iceberg_creation.py
 │   ├── 05_performance_benchmarks.py --
 │   ├── 06_advanced_analytics.py --
 │   └── 07_visualization.py
@@ -227,69 +227,54 @@ SAMPLE_QUERIES = {
 }
 ```
 
-### 4. Iceberg Implementation
-**File:** `scripts/04_iceberg_conversion.py`
+### 4. Apache Iceberg Table Creation
+**File:** `scripts/04_iceberg_creation.py`
 **Requirements:**
 ```python
-from pyiceberg.catalog import load_catalog
-from pyiceberg.schema import Schema
-from pyiceberg.types import *
+import pandas as pd
 import pyarrow as pa
+from pathlib import Path
+from pyiceberg.catalog.sql import SqlCatalog
+from pyiceberg.schema import Schema
+from pyiceberg.types import NestedField, StringType, DoubleType, TimestampType, LongType
 
 class IcebergManager:
+    """Create and manage Apache Iceberg tables using PyIceberg."""
+
     def __init__(self, warehouse_path: str = "data/iceberg_warehouse"):
-        self.warehouse_path = warehouse_path
-        self.catalog = self._setup_catalog()
-    
-    def _setup_catalog(self):
-        """Setup Iceberg catalog (local or S3)"""
-        # Support both local and S3 catalogs
-        pass
-    
-    def create_neo_iceberg_table(self, data_source: str) -> str:
-        """Convert NEO data to Iceberg format"""
-        # Required schema definition:
-        schema = Schema(
-            NestedField(1, "des", StringType()),
-            NestedField(2, "orbit_id", StringType()),
-            NestedField(3, "jd", DoubleType()),
-            NestedField(4, "cd", StringType()),
-            NestedField(5, "dist", DoubleType()),
-            NestedField(6, "dist_min", DoubleType()),
-            NestedField(7, "dist_max", DoubleType()),
-            NestedField(8, "v_rel", DoubleType()),
-            NestedField(9, "v_inf", DoubleType()),
-            NestedField(10, "t_sigma_f", StringType()),
-            NestedField(11, "h", DoubleType()),
-            NestedField(12, "fullname", StringType()),
-            NestedField(13, "approach_year", IntegerType()),  # Partition column
-        )
-        
-        # Implementation requirements:
-        # - Table creation with partitioning
-        # - Data loading from DuckDB
-        # - Metadata optimization
-        pass
-    
-    def demonstrate_time_travel(self, table_name: str) -> Dict[str, Any]:
-        """Show Iceberg time travel capabilities"""
-        # Required demonstrations:
-        # - Historical snapshots
-        # - Table history
-        # - Rollback operations
-        # - Schema evolution
-        pass
-    
-    def perform_table_maintenance(self, table_name: str) -> None:
-        """Perform Iceberg table maintenance"""
-        # Operations: expire snapshots, compact files, etc.
+        self.warehouse_path = Path(warehouse_path)
+        self.warehouse_path.mkdir(parents=True, exist_ok=True)
+
+        # Use SQLite catalog (simple, no external dependencies)
+        db_path = self.warehouse_path / "catalog.db"
+        self.catalog = SqlCatalog("demo_catalog", uri=f"sqlite:///{db_path}")
+
+        # Source data from parquet file
+        self.source_parquet = Path("data/raw/neo_data_20250917_121532.parquet")
+
+    def create_iceberg_table(self) -> str:
+        """Create Iceberg table from parquet source"""
+        # 1. Read data from parquet file (not DuckDB)
+        # 2. Define Iceberg schema
+        # 3. Create table WITHOUT partitioning (no folder structure)
+        # 4. Write all records to Iceberg table
         pass
 
-# Required integration with DuckDB
-def setup_duckdb_iceberg_integration(duckdb_conn, iceberg_table_path: str):
-    """Setup DuckDB to query Iceberg tables"""
-    # Must support querying Iceberg tables from DuckDB
-    pass
+    def add_simple_column(self, table_name: str) -> dict:
+        """Add a simple string column for schema evolution demo"""
+        # Add 'risk_level' column
+        pass
+
+    def demonstrate_time_travel(self, table_name: str) -> dict:
+        """Query different snapshots to show time travel"""
+        # Show record counts from different snapshots
+        pass
+
+# Key Changes:
+# - Source: parquet file instead of DuckDB table
+# - No partitioning (single data storage)
+# - All records loaded (not limited to 1000)
+# - Output: iceberg_features_demo.md file with results
 ```
 
 ### 5. Performance Benchmarking
@@ -528,8 +513,18 @@ CHART_CONFIGS = {
     },
     "risk_dashboard": {
         "title": "Near-Earth Object Risk Assessment",
+        "subtitle": "Risk Score = (30-H_magnitude)*1.33 + max(0.1-distance_AU)*400 + min(velocity,60)*0.33",
         "size_range": [10, 100],
-        "color_scale": "Reds"
+        "color_scale": "Reds",
+        "chart_layout": {
+            "scatter_plot": {"color_scale": "Reds", "legend_position": "bottom"},
+            "pie_chart": {"color_scheme": "Reds", "legend_position": "bottom"},
+            "risk_distribution": {"color_gradient": "Reds"},
+            "high_risk_objects": {"include_time_axis": true, "hover_details": ["approach_date", "velocity_kms", "distance_au"]}
+        },
+        "data_processing": {
+            "duplicate_handling": "highest_risk_only"
+        }
     },
     "timeline": {
         "title": "NEO Discovery Timeline",
@@ -541,7 +536,6 @@ CHART_CONFIGS = {
 # Required export formats:
 EXPORT_FORMATS = ["png", "pdf", "html", "svg"]
 ```
-
 ## Testing Requirements
 
 ### Unit Tests Required
@@ -881,6 +875,9 @@ Before considering any code complete, verify:
 - [ ] Code follows PEP 8 standards
 - [ ] Dependencies properly managed in requirements.txt
 
+
+
+
 #### Demo-Specific Requirements
 - **Reliability:** All demo code must work flawlessly during presentation
 - **Timing:** Each demo segment must complete within allocated time
@@ -992,7 +989,7 @@ jupyter nbconvert --execute notebooks/presentation_demo.ipynb
 
 ## Implementation Phases for Claude Code
 
-### Phase 1: Foundation Setup (Day 1)
+### Phase 1: Foundation Setup
 **Claude Code Commands:**
 ```bash
 # Start here - Claude Code will read PRD and create structure
@@ -1014,7 +1011,7 @@ jupyter nbconvert --execute notebooks/presentation_demo.ipynb
 - README with clear setup instructions
 - Working virtual environment with all packages
 
-### Phase 2: Data Pipeline Development (Day 1-2)
+### Phase 2: Data Pipeline Development 
 **Claude Code Commands:**
 ```bash
 "Implement the NEODataIngester class in scripts/02_data_ingestion.py exactly as specified in the PRD"
@@ -1033,7 +1030,7 @@ jupyter nbconvert --execute notebooks/presentation_demo.ipynb
 - Unit tests passing
 - Sample data successfully loaded
 
-### Phase 3: Iceberg Integration (Day 2-3)
+### Phase 3: Iceberg Integration
 **Claude Code Commands:**
 ```bash
 "Implement the IcebergManager class in scripts/04_iceberg_conversion.py with full schema definition"

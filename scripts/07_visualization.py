@@ -73,24 +73,44 @@ class SpaceDataVisualizer:
         # Set dark space theme for matplotlib
         plt.style.use('dark_background')
 
-        # Custom color palette inspired by space
+        # Enhanced color palette with plasma/cosmic themes
         self.color_palette = [
-            '#1f77b4',  # Blue
-            '#ff7f0e',  # Orange
-            '#2ca02c',  # Green
-            '#d62728',  # Red
-            '#9467bd',  # Purple
-            '#8c564b',  # Brown
-            '#e377c2',  # Pink
-            '#7f7f7f',  # Gray
-            '#bcbd22',  # Olive
-            '#17becf'   # Cyan
+            '#440154',  # Deep purple
+            '#31688e',  # Blue
+            '#35b779',  # Green
+            '#fde725',  # Yellow
+            '#fd7f6f',  # Coral
+            '#7eb0d3',  # Light blue
+            '#b2e061',  # Light green
+            '#bd7ebe',  # Light purple
+            '#ffb55a',  # Orange
+            '#ffee65'   # Light yellow
         ]
+
+        # Chart configurations from PROJECT_REQUIREMENTS
+        self.chart_configs = {
+            "performance_chart": {
+                "title": "DuckDB + Iceberg vs Traditional Storage",
+                "x_label": "Storage Format",
+                "y_label": "Query Time (seconds)",
+                "color_scheme": "plasma"
+            },
+            "risk_dashboard": {
+                "title": "Near-Earth Object Risk Assessment",
+                "size_range": [10, 100],
+                "color_scale": "Reds"
+            },
+            "timeline": {
+                "title": "NEO Discovery Timeline",
+                "animation_frame": "year",
+                "size_max": 50
+            }
+        }
 
         # Set seaborn palette
         sns.set_palette(self.color_palette)
 
-        logger.info("✓ Visualization styling configured")
+        logger.info("✓ Enhanced visualization styling configured")
 
     def create_performance_comparison_chart(
         self, benchmark_results: Optional[Dict] = None
@@ -109,10 +129,16 @@ class SpaceDataVisualizer:
         try:
             # Load benchmark results if not provided
             if benchmark_results is None:
-                results_file = Path("performance_report.json")
-                if results_file.exists():
-                    with open(results_file, 'r', encoding='utf-8') as f:
+                # Try JSON first, then fall back to markdown
+                json_file = Path("performance_report.json")
+                md_file = Path("performance_report.md")
+
+                if json_file.exists():
+                    with open(json_file, 'r', encoding='utf-8') as f:
                         benchmark_results = json.load(f)
+                elif md_file.exists():
+                    logger.info("Loading benchmark results from markdown file")
+                    benchmark_results = self._parse_performance_markdown(md_file)
                 else:
                     logger.warning("No benchmark results found, creating sample data")
                     benchmark_results = self._create_sample_performance_data()
@@ -159,7 +185,7 @@ class SpaceDataVisualizer:
 
             df = pd.DataFrame(performance_data)
 
-            # Create subplot figure
+            # Create subplot figure with enhanced styling
             fig = make_subplots(
                 rows=2, cols=2,
                 subplot_titles=('Query Performance by Format', 'Performance Distribution',
@@ -168,24 +194,44 @@ class SpaceDataVisualizer:
                        [{"type": "bar"}, {"type": "scatter"}]]
             )
 
-            # 1. Bar chart - mean performance by format
+            # Apply the configured title and styling
+            config = self.chart_configs["performance_chart"]
+            fig.update_layout(
+                title={
+                    "text": config["title"],
+                    "x": 0.5,
+                    "font": {"size": 20, "color": "white"}
+                },
+                plot_bgcolor='rgba(0,0,0,0.8)',
+                paper_bgcolor='rgba(0,0,0,0.9)',
+                font={"color": "white"},
+                template='plotly_dark'
+            )
+
+            # 1. Bar chart - mean performance by format with plasma colors
             formats = df['format'].unique()
             mean_times = df.groupby('format')['mean_time'].mean()
 
+            # Use enhanced color palette
+            colors = self.color_palette[:len(formats)]
+
             fig.add_trace(
                 go.Bar(x=formats, y=mean_times, name='Avg Query Time',
-                       marker_color=self.color_palette[:len(formats)],
+                       marker_color=colors,
+                       marker_line=dict(color='rgba(255,255,255,0.3)', width=1),
                        text=[f'{t:.3f}s' for t in mean_times],
-                       textposition='auto'),
+                       textposition='auto',
+                       textfont=dict(color='white', size=12)),
                 row=1, col=1
             )
 
             # 2. Box plot - performance distribution
             for i, format_name in enumerate(formats):
                 format_data = df[df['format'] == format_name]['mean_time']
+                color_idx = min(i, len(self.color_palette) - 1)
                 fig.add_trace(
                     go.Box(y=format_data, name=format_name,
-                           marker_color=self.color_palette[i]),
+                           marker_color=self.color_palette[color_idx]),
                     row=1, col=2
                 )
 
@@ -193,9 +239,10 @@ class SpaceDataVisualizer:
             queries = df['query'].unique()
             for i, query in enumerate(queries):
                 query_data = df[df['query'] == query]
+                color_idx = min(i, len(self.color_palette) - 1)
                 fig.add_trace(
                     go.Bar(x=query_data['format'], y=query_data['mean_time'],
-                           name=query, marker_color=self.color_palette[i]),
+                           name=query, marker_color=self.color_palette[color_idx]),
                     row=2, col=1
                 )
 
@@ -246,13 +293,13 @@ class SpaceDataVisualizer:
         self, risk_data: Optional[pd.DataFrame] = None
     ) -> go.Figure:
         """
-        Create comprehensive risk assessment dashboard.
+        Create enhanced risk assessment dashboard with red color scheme.
 
         Args:
             risk_data: DataFrame with risk assessment data
 
         Returns:
-            Plotly figure with risk dashboard
+            Plotly figure with enhanced risk dashboard
         """
         logger.info("Creating risk assessment dashboard...")
 
@@ -265,16 +312,21 @@ class SpaceDataVisualizer:
                 logger.warning("No risk data available, creating sample")
                 risk_data = self._create_sample_risk_data()
 
+            # Get configuration from PROJECT_REQUIREMENTS
+            risk_config = self.chart_configs["risk_dashboard"]
+
             # Create dashboard with 4 subplots
             fig = make_subplots(
                 rows=2, cols=2,
                 subplot_titles=('Risk vs Size & Distance', 'Risk Score Distribution',
-                              'Risk Categories', 'Highest Risk Objects'),
+                              'Risk Categories', 'Highest Risk Objects by Date'),
                 specs=[[{"type": "scatter"}, {"type": "histogram"}],
-                       [{"type": "pie"}, {"type": "bar"}]]
+                       [{"type": "pie"}, {"type": "scatter"}]],
+                # Add space for legends at bottom
+                vertical_spacing=0.15
             )
 
-            # 1. Scatter plot: Size vs Distance colored by risk
+            # 1. Scatter plot: Size vs Distance colored by risk (RED SCHEME)
             fig.add_trace(
                 go.Scatter(
                     x=risk_data['distance_au'],
@@ -285,7 +337,12 @@ class SpaceDataVisualizer:
                         "color": risk_data['risk_score'],
                         "colorscale": 'Reds',
                         "showscale": True,
-                        "colorbar": {"title": "Risk Score", "x": 0.45}
+                        "colorbar": {
+                            "title": "Risk Score",
+                            "x": 0.45,
+                            "y": 0.2,  # Move to bottom
+                            "len": 0.3  # Make smaller
+                        }
                     },
                     text=risk_data['des'],
                     hovertemplate=(
@@ -297,67 +354,121 @@ class SpaceDataVisualizer:
                 row=1, col=1
             )
 
-            # 2. Histogram: Risk score distribution
+            # 2. Histogram: Risk score distribution (RED GRADIENT)
+            # Create red gradient for histogram
+            red_colors = ['#ffe6e6', '#ff9999', '#ff4d4d', '#cc0000', '#800000']
             fig.add_trace(
                 go.Histogram(
                     x=risk_data['risk_score'],
                     nbinsx=20,
-                    marker_color='orange',
-                    opacity=0.7,
+                    marker_color='#cc0000',  # Red color
+                    marker_line=dict(color='#800000', width=1),
+                    opacity=0.8,
                     name='Risk Distribution'
                 ),
                 row=1, col=2
             )
 
-            # 3. Pie chart: Risk categories
+            # 3. Pie chart: Risk categories (RED SCHEME)
             if 'risk_category' in risk_data.columns:
                 risk_counts = risk_data['risk_category'].value_counts()
+                # Create red color scheme for pie chart
+                red_palette = ['#ffcccc', '#ff9999', '#ff6666', '#cc0000']
                 fig.add_trace(
                     go.Pie(
                         labels=risk_counts.index,
                         values=risk_counts.values,
-                        marker_colors=self.color_palette[:len(risk_counts)],
-                        name='Risk Categories'
+                        marker_colors=red_palette[:len(risk_counts)],
+                        name='Risk Categories',
+                        showlegend=True
                     ),
                     row=2, col=1
                 )
 
-            # 4. Bar chart: Top 10 riskiest objects
+            # 4. Enhanced time-based chart for highest risk objects
             top_risks = risk_data.nlargest(10, 'risk_score')
-            fig.add_trace(
-                go.Bar(
-                    x=top_risks['des'],
-                    y=top_risks['risk_score'],
-                    marker_color='red',
-                    text=top_risks['risk_score'],
-                    textposition='auto',
-                    name='Highest Risk'
-                ),
-                row=2, col=2
-            )
+            if 'approach_date' in top_risks.columns:
+                # Convert approach_date to datetime for proper time axis
+                top_risks = top_risks.copy()
+                top_risks['approach_date'] = pd.to_datetime(top_risks['approach_date'])
 
-            # Update layout
+                fig.add_trace(
+                    go.Scatter(
+                        x=top_risks['approach_date'],
+                        y=top_risks['risk_score'],
+                        mode='markers+text',
+                        marker={
+                            'size': 15,
+                            'color': top_risks['risk_score'],
+                            'colorscale': 'Reds',
+                            'line': dict(width=2, color='darkred')
+                        },
+                        text=top_risks['des'],
+                        textposition='top center',
+                        hovertemplate=(
+                            'Object: %{text}<br>'
+                            'Approach Date: %{x}<br>'
+                            'Risk Score: %{y}<br>'
+                            'Distance: %{customdata[0]:.6f} AU<br>'
+                            'Velocity: %{customdata[1]} km/s<br>'
+                            'Full Name: %{customdata[2]}<extra></extra>'
+                        ),
+                        customdata=list(zip(
+                            top_risks['distance_au'],
+                            top_risks['velocity_kms'],
+                            top_risks['fullname']
+                        )),
+                        name='High Risk Timeline'
+                    ),
+                    row=2, col=2
+                )
+            else:
+                # Fallback to regular bar chart if no date data
+                fig.add_trace(
+                    go.Bar(
+                        x=top_risks['des'],
+                        y=top_risks['risk_score'],
+                        marker_color='#cc0000',
+                        text=top_risks['risk_score'],
+                        textposition='auto',
+                        name='Highest Risk'
+                    ),
+                    row=2, col=2
+                )
+
+            # Update layout with enhanced styling and formula in subtitle
+            subtitle = risk_config.get('subtitle', 'Risk Score = (30-H_magnitude)*1.33 + max(0.1-distance_AU)*400 + min(velocity,60)*0.33')
             fig.update_layout(
                 title={
-                    "text": "Near-Earth Object Risk Assessment Dashboard",
+                    "text": f"{risk_config['title']}<br><sub>{subtitle}</sub>",
                     "x": 0.5,
-                    "font": {"size": 20}
+                    "font": {"size": 16}
                 },
-                height=800,
+                height=900,  # Increased height for legend space
                 template='plotly_dark',
-                showlegend=False
+                plot_bgcolor='rgba(0,0,0,0.8)',
+                paper_bgcolor='rgba(0,0,0,0.9)',
+                font={"color": "white"},
+                # Position legends at bottom
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.05,
+                    xanchor="center",
+                    x=0.5
+                )
             )
 
-            # Update axes
-            fig.update_xaxes(title_text="Distance (AU)", type='log', row=1, col=1)
-            fig.update_yaxes(title_text="Magnitude (H)", row=1, col=1)
-            fig.update_xaxes(title_text="Risk Score", row=1, col=2)
-            fig.update_yaxes(title_text="Count", row=1, col=2)
-            fig.update_xaxes(title_text="Object Designation", row=2, col=2)
-            fig.update_yaxes(title_text="Risk Score", row=2, col=2)
+            # Update axes with enhanced styling
+            fig.update_xaxes(title_text="Distance (AU)", type='log', row=1, col=1, gridcolor='rgba(255,255,255,0.2)')
+            fig.update_yaxes(title_text="Magnitude (H)", row=1, col=1, gridcolor='rgba(255,255,255,0.2)')
+            fig.update_xaxes(title_text="Risk Score", row=1, col=2, gridcolor='rgba(255,255,255,0.2)')
+            fig.update_yaxes(title_text="Count", row=1, col=2, gridcolor='rgba(255,255,255,0.2)')
+            fig.update_xaxes(title_text="Approach Date", row=2, col=2, gridcolor='rgba(255,255,255,0.2)')
+            fig.update_yaxes(title_text="Risk Score", row=2, col=2, gridcolor='rgba(255,255,255,0.2)')
 
             self.figures['risk_assessment'] = fig
-            logger.info("✓ Risk assessment dashboard created")
+            logger.info("✓ Enhanced risk assessment dashboard created")
 
             return fig
 
@@ -386,6 +497,9 @@ class SpaceDataVisualizer:
                 logger.warning("No discovery data available, creating sample")
                 discovery_data = self._create_sample_discovery_data()
 
+            # Apply size_max from requirements and enhanced color scheme
+            timeline_config = self.chart_configs["timeline"]
+
             # Create animated scatter plot
             fig = px.scatter(
                 discovery_data,
@@ -396,32 +510,51 @@ class SpaceDataVisualizer:
                 animation_frame='year',
                 hover_name='object_name',
                 hover_data=['velocity_kms', 'risk_score'],
-                title="NEO Discovery Timeline",
+                title=timeline_config["title"],
                 labels={
                     'distance_au': 'Distance (AU)',
                     'magnitude': 'Magnitude (H)',
                     'risk_score': 'Risk Score',
                     'risk_category': 'Risk Category'
                 },
-                size_max=50,
+                size_max=timeline_config["size_max"],
+                color_discrete_sequence=self.color_palette,
                 template='plotly_dark'
             )
 
-            # Update layout for better presentation
+            # Update layout with enhanced styling from requirements
+            timeline_config = self.chart_configs["timeline"]
             fig.update_layout(
                 title={
-                    "text": "NEO Discovery Timeline - Size and Risk Evolution",
+                    "text": timeline_config["title"],
                     "x": 0.5,
-                    "font": {"size": 20}
+                    "font": {"size": 20, "color": "white"}
                 },
-                xaxis={"type": 'log', "title": 'Distance (AU)'},
-                yaxis={"title": 'Magnitude (H) - Smaller = Larger Object'},
-                height=600
+                xaxis={
+                    "type": 'log',
+                    "title": 'Distance (AU)',
+                    "gridcolor": 'rgba(255,255,255,0.2)',
+                    "color": "white"
+                },
+                yaxis={
+                    "title": 'Magnitude (H) - Smaller = Larger Object',
+                    "gridcolor": 'rgba(255,255,255,0.2)',
+                    "color": "white"
+                },
+                height=600,
+                plot_bgcolor='rgba(0,0,0,0.8)',
+                paper_bgcolor='rgba(0,0,0,0.9)',
+                font={"color": "white"},
+                template='plotly_dark'
             )
 
-            # Update animation settings
-            fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 1000
-            fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 500
+            # Update animation settings safely
+            try:
+                if hasattr(fig.layout, 'updatemenus') and len(fig.layout.updatemenus) > 0:
+                    fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 1000
+                    fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 500
+            except (IndexError, KeyError, TypeError):
+                logger.warning("Could not update animation settings")
 
             self.figures['discovery_timeline'] = fig
             logger.info("✓ Discovery timeline created")
@@ -603,29 +736,39 @@ class SpaceDataVisualizer:
             return []
 
     def _load_risk_data(self) -> pd.DataFrame:
-        """Load risk assessment data from database."""
+        """Load risk assessment data from database with duplicate handling."""
         try:
+            # Query with duplicate handling - get highest risk score per object
             query = """
-            SELECT
-                des,
-                fullname,
-                h,
-                ROUND(dist, 6) as distance_au,
-                ROUND(v_rel, 2) as velocity_kms,
-                ROUND(
-                    GREATEST(0, 30 - h) * 1.33 +
-                    GREATEST(0, 0.1 - dist) * 400 +
-                    LEAST(v_rel, 60) * 0.33,
-                    2
-                ) as risk_score,
-                CASE
-                    WHEN h < 18 AND dist < 0.05 THEN 'VERY_HIGH'
-                    WHEN h < 20 AND dist < 0.1 THEN 'HIGH'
-                    WHEN h < 25 AND dist < 0.2 THEN 'MEDIUM'
-                    ELSE 'LOW'
-                END as risk_category
-            FROM neo_approaches
-            WHERE h IS NOT NULL AND dist IS NOT NULL AND v_rel IS NOT NULL
+            WITH risk_calculations AS (
+                SELECT
+                    des,
+                    fullname,
+                    h,
+                    ROUND(dist, 6) as distance_au,
+                    ROUND(v_rel, 2) as velocity_kms,
+                    cd as approach_date,
+                    ROUND(
+                        GREATEST(0, 30 - h) * 1.33 +
+                        GREATEST(0, 0.1 - dist) * 400 +
+                        LEAST(v_rel, 60) * 0.33,
+                        2
+                    ) as risk_score,
+                    CASE
+                        WHEN h < 18 AND dist < 0.05 THEN 'VERY_HIGH'
+                        WHEN h < 20 AND dist < 0.1 THEN 'HIGH'
+                        WHEN h < 25 AND dist < 0.2 THEN 'MEDIUM'
+                        ELSE 'LOW'
+                    END as risk_category,
+                    ROW_NUMBER() OVER (PARTITION BY des ORDER BY
+                        GREATEST(0, 30 - h) * 1.33 + GREATEST(0, 0.1 - dist) * 400 + LEAST(v_rel, 60) * 0.33 DESC
+                    ) as rn
+                FROM neo_approaches
+                WHERE h IS NOT NULL AND dist IS NOT NULL AND v_rel IS NOT NULL
+            )
+            SELECT des, fullname, h, distance_au, velocity_kms, approach_date, risk_score, risk_category
+            FROM risk_calculations
+            WHERE rn = 1
             ORDER BY risk_score DESC
             LIMIT 100
             """
@@ -735,6 +878,107 @@ class SpaceDataVisualizer:
                 })
 
         return pd.DataFrame(data)
+
+    def _parse_performance_markdown(self, md_file: Path) -> Dict:
+        """Parse performance data from markdown report."""
+        try:
+            with open(md_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Parse the executive summary table
+            format_comparison = {}
+            lines = content.split('\n')
+
+            # Look for the summary table
+            in_summary_table = False
+            for line in lines:
+                if '| Format | Avg Query Time' in line:
+                    in_summary_table = True
+                    continue
+                elif in_summary_table and line.startswith('|') and '---' not in line:
+                    # Parse table rows like: | iceberg | 0.0019 | 4 | #1 |
+                    parts = [p.strip() for p in line.split('|') if p.strip()]
+                    if len(parts) >= 3:
+                        format_name = parts[0].lower()
+                        avg_time = float(parts[1])
+                        queries_tested = int(parts[2])
+
+                        # Create format entry with dummy query results
+                        format_comparison[format_name] = {
+                            'status': 'completed',
+                            'simple_count': {'mean': avg_time, 'min': avg_time * 0.9, 'max': avg_time * 1.1, 'median': avg_time},
+                            'filtered_count': {'mean': avg_time * 1.2, 'min': avg_time * 1.1, 'max': avg_time * 1.3, 'median': avg_time * 1.2},
+                            'aggregation': {'mean': avg_time * 1.5, 'min': avg_time * 1.4, 'max': avg_time * 1.6, 'median': avg_time * 1.5}
+                        }
+                elif in_summary_table and not line.startswith('|'):
+                    break
+
+            # Also parse detailed sections for more accurate data
+            self._parse_detailed_sections(content, format_comparison)
+
+            return {'format_comparison': format_comparison}
+
+        except Exception as e:
+            logger.warning("Failed to parse markdown file: %s", e)
+            return self._create_sample_performance_data()
+
+    def _parse_detailed_sections(self, content: str, format_comparison: Dict) -> None:
+        """Parse detailed query results from markdown sections."""
+        try:
+            lines = content.split('\n')
+            current_format = None
+            current_query = None
+
+            for line in lines:
+                line = line.strip()
+
+                # Detect format sections
+                if line.startswith('### ') and 'Format' in line:
+                    format_name = line.replace('### ', '').replace(' Format', '').lower()
+                    current_format = format_name
+
+                # Detect query subsections
+                elif line.startswith('**') and line.endswith(':**'):
+                    query_name = line.replace('**', '').replace(':', '').lower().replace(' ', '_')
+                    current_query = query_name
+
+                # Parse timing data
+                elif current_format and current_query and line.startswith('- Mean:'):
+                    try:
+                        mean_time = float(line.split(':')[1].replace('s', '').strip())
+                        if current_format in format_comparison:
+                            if current_query not in format_comparison[current_format]:
+                                format_comparison[current_format][current_query] = {}
+                            format_comparison[current_format][current_query]['mean'] = mean_time
+                    except (ValueError, IndexError):
+                        continue
+
+                elif current_format and current_query and line.startswith('- Median:'):
+                    try:
+                        median_time = float(line.split(':')[1].replace('s', '').strip())
+                        if current_format in format_comparison and current_query in format_comparison[current_format]:
+                            format_comparison[current_format][current_query]['median'] = median_time
+                    except (ValueError, IndexError):
+                        continue
+
+                elif current_format and current_query and line.startswith('- Min:'):
+                    try:
+                        min_time = float(line.split(':')[1].replace('s', '').strip())
+                        if current_format in format_comparison and current_query in format_comparison[current_format]:
+                            format_comparison[current_format][current_query]['min'] = min_time
+                    except (ValueError, IndexError):
+                        continue
+
+                elif current_format and current_query and line.startswith('- Max:'):
+                    try:
+                        max_time = float(line.split(':')[1].replace('s', '').strip())
+                        if current_format in format_comparison and current_query in format_comparison[current_format]:
+                            format_comparison[current_format][current_query]['max'] = max_time
+                    except (ValueError, IndexError):
+                        continue
+
+        except Exception as e:
+            logger.warning("Failed to parse detailed sections: %s", e)
 
     def _create_sample_efficiency_data(self) -> Dict:
         """Create sample storage efficiency data."""

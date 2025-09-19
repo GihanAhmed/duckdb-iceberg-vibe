@@ -1,5 +1,5 @@
 # Space Analytics Advanced Analytics Report
-Generated: 2025-09-18 16:18:34
+Generated: 2025-09-19 10:38:57
 
 ## Executive Summary
 
@@ -16,7 +16,7 @@ Generated: 2025-09-18 16:18:34
 ### Key Findings
 
 - Identified 15 high-risk objects (max risk score: 63.37)
-- Most recent year: 1967 with 70 approaches
+- Most recent year: 1966 with 845 approaches
 - Analyzed 49957 objects across 4 size categories
 - Closest recorded approach: 0.00034653 AU
 
@@ -27,7 +27,7 @@ Generated: 2025-09-18 16:18:34
 - **Valid Magnitudes**: 49,957
 - **Valid Distances**: 50,000
 - **Valid Velocities**: 50,000
-- **Year Range**: 1900 - 1967
+- **Year Range**: 1900 - 1966
 
 ## Detailed Analysis Results
 
@@ -50,25 +50,25 @@ Generated: 2025-09-18 16:18:34
 
 | Size Category | Object Count | Avg Distance (AU) | Avg Velocity (km/s) |
 |---------------|--------------|-------------------|--------------------|
-| Very Large (>1km) | 1,255 | 0.131811 | 18.30 |
-| Large (140m-1km) | 15,886 | 0.128234 | 15.32 |
-| Medium (30-140m) | 18,626 | 0.117909 | 10.73 |
-| Small (<30m) | 14,190 | 0.101664 | 8.73 |
+| Very Large (>1km) | 1,254 | 0.131784 | 18.30 |
+| Large (140m-1km) | 15,873 | 0.128227 | 15.32 |
+| Medium (30-140m) | 18,627 | 0.117920 | 10.73 |
+| Small (<30m) | 14,203 | 0.101699 | 8.74 |
 
 ### Yearly Trends (Most Recent)
 
 | Year | Total Approaches | Unique Objects | Avg Distance (AU) | Closest Approach (AU) |
 |------|------------------|----------------|-------------------|----------------------|
-| 1967 | 70 | 70 | 0.103034 | 0.006209 |
-| 1966 | 846 | 813 | 0.115696 | 0.003892 |
-| 1965 | 815 | 785 | 0.114489 | 0.002279 |
-| 1964 | 833 | 805 | 0.114427 | 0.001695 |
-| 1963 | 810 | 782 | 0.117666 | 0.007601 |
-| 1962 | 853 | 822 | 0.115562 | 0.002760 |
-| 1961 | 893 | 858 | 0.117308 | 0.002363 |
-| 1960 | 822 | 788 | 0.116015 | 0.001230 |
-| 1959 | 875 | 843 | 0.114466 | 0.001365 |
-| 1958 | 830 | 797 | 0.112169 | 0.001222 |
+| 1966 | 845 | 813 | 0.115941 | 0.003892 |
+| 1965 | 816 | 786 | 0.114525 | 0.002279 |
+| 1964 | 834 | 806 | 0.114441 | 0.001695 |
+| 1963 | 812 | 784 | 0.117576 | 0.007601 |
+| 1962 | 854 | 823 | 0.115452 | 0.002760 |
+| 1961 | 897 | 860 | 0.117158 | 0.002363 |
+| 1960 | 824 | 790 | 0.115964 | 0.001230 |
+| 1959 | 876 | 844 | 0.114408 | 0.001365 |
+| 1958 | 832 | 799 | 0.112191 | 0.001222 |
+| 1957 | 819 | 792 | 0.116010 | 0.000406 |
 
 ### Close Approach Analysis
 
@@ -77,9 +77,9 @@ Generated: 2025-09-18 16:18:34
 - **Total Approaches**: 50,000.0
 - **Closest Ever**: 0.00034653 AU
 - **Farthest**: N/A AU
-- **Average Distance**: 0.116939 AU
-- **Very Close Approaches** (<0.01 AU): 471.0
-- **Close Approaches** (<0.05 AU): 7,037.0
+- **Average Distance**: 0.116943 AU
+- **Very Close Approaches** (<0.01 AU): 470.0
+- **Close Approaches** (<0.05 AU): 7,033.0
 
 #### Record Holders
 

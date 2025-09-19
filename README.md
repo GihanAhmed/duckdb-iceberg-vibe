@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![DuckDB](https://img.shields.io/badge/DuckDB-0.9.0+-yellow.svg)](https://duckdb.org)
-[![Iceberg](https://img.shields.io/badge/Apache%20Iceberg-0.5.0+-orange.svg)](https://iceberg.apache.org)
+[![Iceberg](https://img.shields.io/badge/Apache%20Iceberg-0.7.0+-orange.svg)](https://iceberg.apache.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 This project demonstrates the power of combining **DuckDB** with **Apache Iceberg** for high-performance space analytics, using NASA's Near-Earth Object (NEO) close approach data as a compelling use case.
@@ -32,6 +32,32 @@ This project demonstrates the power of combining **DuckDB** with **Apache Iceber
 - [Contributing](#-contributing)
 - [License](#-license)
 
+## 🎯 Key Technologies
+
+### 🧊 Apache Iceberg + PyIceberg
+This project uses **PyIceberg** - the official Python implementation of Apache Iceberg:
+
+```bash
+pip install pyiceberg[duckdb]  # Includes DuckDB integration
+```
+
+**Key Features:**
+- 🗂️ **Filesystem Catalog**: No external metadata store required
+- 🔗 **DuckDB Integration**: Native connectivity for high-performance queries
+- 📝 **Metadata Management**: Automatic JSON metadata files
+- 🏗️ **Table Creation**: Programmatic schema definition and partitioning
+- ⏰ **Snapshot Management**: Built-in versioning and time travel
+- 📊 **Schema Evolution**: Add/modify columns safely
+
+**True Iceberg Format:**
+PyIceberg creates proper Iceberg tables with:
+- `metadata/` directory with versioned JSON files
+- UUID-based data file naming
+- Snapshot history tracking
+- Manifest files for efficient queries
+- No folder-based partitioning (data stored flat)
+- Direct parquet file source loading
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -58,7 +84,7 @@ python scripts/02_data_ingestion.py
 
 # Run the full pipeline
 python scripts/03_duckdb_setup.py
-python scripts/04_iceberg_conversion.py
+python scripts/04_iceberg_creation.py
 python scripts/05_performance_benchmarks.py
 ```
 
@@ -84,7 +110,7 @@ space-analytics-demo/
 │   ├── 📄 01_setup_environment.py  # Environment validation
 │   ├── 📄 02_data_ingestion.py     # NASA data pipeline
 │   ├── 📄 03_duckdb_setup.py       # Database setup
-│   ├── 📄 04_iceberg_conversion.py # Iceberg integration
+│   ├── 📄 04_iceberg_creation.py   # Iceberg table creation
 │   ├── 📄 05_performance_benchmarks.py # Performance testing
 │   ├── 📄 06_advanced_analytics.py # Risk & trend analysis
 │   └── 📄 07_visualization.py      # Interactive charts
@@ -191,7 +217,7 @@ python scripts/03_duckdb_setup.py
 ### Step 4: Iceberg Integration
 
 ```bash
-python scripts/04_iceberg_conversion.py
+python scripts/04_iceberg_creation.py
 ```
 
 **What it does:**
@@ -246,7 +272,7 @@ Each script in the pipeline generates specific output files:
 |--------|----------------|---------|
 | `02_data_ingestion.py` | `data/raw/neo_data_YYYYMMDD_HHMMSS.parquet` | Raw NASA NEO data |
 | `03_duckdb_setup.py` | `space_analytics.db` | Local DuckDB database |
-| `04_iceberg_conversion.py` | `data/iceberg_warehouse/neo_approaches_iceberg/`<br>`metadata/metadata.json`<br>`maintenance_report.json` | Iceberg format with metadata |
+| `04_iceberg_creation.py` | `data/iceberg_warehouse/`<br>`catalog.db`<br>`demo.db/neo_approaches_iceberg/` | True Iceberg format with metadata |
 | `05_performance_benchmarks.py` | `performance_report.md` | Performance comparison report |
 | `06_advanced_analytics.py` | `analytics_results.md` | Risk analysis, trends, statistics |
 | `07_visualization.py` | `visualizations/performance_comparison.html`<br>`visualizations/risk_assessment.html`<br>`visualizations/discovery_timeline.html`<br>`visualizations/storage_efficiency.html` | Interactive HTML charts |

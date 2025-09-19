@@ -1,0 +1,187 @@
+{
+  "conversion_type": "simplified_duckdb_native",
+  "table_path": "data/iceberg_warehouse/neo_approaches_iceberg_partitioned",
+  "table_info": {
+    "table_path": "data/iceberg_warehouse/neo_approaches_iceberg_partitioned",
+    "exists": true,
+    "timestamp": "2025-09-19T08:44:49.332803",
+    "record_count": 50000,
+    "partitions": {
+      "1900": 689,
+      "1901": 636,
+      "1902": 668,
+      "1903": 659,
+      "1904": 676,
+      "1905": 679,
+      "1906": 683,
+      "1907": 665,
+      "1908": 717,
+      "1909": 643,
+      "1910": 670,
+      "1911": 696,
+      "1912": 698,
+      "1913": 660,
+      "1914": 677,
+      "1915": 692,
+      "1916": 681,
+      "1917": 705,
+      "1918": 719,
+      "1919": 728,
+      "1920": 750,
+      "1921": 633,
+      "1922": 719,
+      "1923": 660,
+      "1924": 694,
+      "1925": 729,
+      "1926": 721,
+      "1927": 744,
+      "1928": 742,
+      "1929": 714,
+      "1930": 750,
+      "1931": 765,
+      "1932": 740,
+      "1933": 711,
+      "1934": 730,
+      "1935": 719,
+      "1936": 734,
+      "1937": 755,
+      "1938": 774,
+      "1939": 755,
+      "1940": 759,
+      "1941": 780,
+      "1942": 727,
+      "1943": 736,
+      "1944": 743,
+      "1945": 771,
+      "1946": 783,
+      "1947": 780,
+      "1948": 803,
+      "1949": 832,
+      "1950": 801,
+      "1951": 810,
+      "1952": 785,
+      "1953": 820,
+      "1954": 801,
+      "1955": 819,
+      "1956": 804,
+      "1957": 819,
+      "1958": 830,
+      "1959": 875,
+      "1960": 822,
+      "1961": 893,
+      "1962": 853,
+      "1963": 810,
+      "1964": 833,
+      "1965": 815,
+      "1966": 846,
+      "1967": 70
+    },
+    "partition_count": 68,
+    "file_count": 68,
+    "total_size_mb": 5.337175369262695
+  },
+  "time_travel": {
+    "table_path": "data/iceberg_warehouse/neo_approaches_iceberg_partitioned",
+    "snapshots": [
+      {
+        "note": "Snapshot history not available in this DuckDB version"
+      }
+    ],
+    "queries": [
+      {
+        "type": "basic_scan",
+        "query": "SELECT COUNT(*) FROM read_parquet('data/iceberg_warehouse/neo_approaches_iceberg_partitioned/**/*.parquet')",
+        "result": {
+          "record_count": 50000
+        }
+      },
+      {
+        "type": "partition_scan",
+        "query": "\n                SELECT approach_year, COUNT(*) as records\n                FROM read_parquet('data/iceberg_warehouse/neo_approaches_iceberg_partitioned/**/*.parquet')\n                WHERE approach_year BETWEEN 1960 AND 1970\n                GROUP BY approach_year\n                ORDER BY approach_year\n            ",
+        "result": {
+          "year_counts": {
+            "1960": 822,
+            "1961": 893,
+            "1962": 853,
+            "1963": 810,
+            "1964": 833,
+            "1965": 815,
+            "1966": 846,
+            "1967": 70
+          }
+        }
+      }
+    ],
+    "timestamp": "2025-09-19T08:44:49.352425"
+  },
+  "schema_evolution": {
+    "table_path": "data/iceberg_warehouse/neo_approaches_iceberg_partitioned",
+    "operations": [
+      {
+        "operation": "schema_inspection",
+        "status": "completed",
+        "note": "DuckDB Iceberg extension provides read access to Iceberg tables with schema evolution support"
+      }
+    ],
+    "timestamp": "2025-09-19T08:44:49.369813",
+    "original_schema": [
+      {
+        "column": "des",
+        "type": "VARCHAR"
+      },
+      {
+        "column": "fullname",
+        "type": "VARCHAR"
+      },
+      {
+        "column": "cd",
+        "type": "TIMESTAMP_NS"
+      },
+      {
+        "column": "distance_au",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "distance_min_au",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "distance_max_au",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "velocity_rel_kms",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "velocity_inf_kms",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "magnitude_h",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "orbit_id",
+        "type": "VARCHAR"
+      },
+      {
+        "column": "t_sigma_f",
+        "type": "VARCHAR"
+      },
+      {
+        "column": "julian_date",
+        "type": "DOUBLE"
+      },
+      {
+        "column": "created_at",
+        "type": "TIMESTAMP WITH TIME ZONE"
+      },
+      {
+        "column": "approach_year",
+        "type": "BIGINT"
+      }
+    ]
+  },
+  "timestamp": "2025-09-19T08:44:49.374817"
+}
