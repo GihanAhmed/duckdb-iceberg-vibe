@@ -980,6 +980,86 @@ class SpaceDataVisualizer:
         except Exception as e:
             logger.warning("Failed to parse detailed sections: %s", e)
 
+    def _parse_performance_markdown(self, md_file: Path) -> Dict:
+        """Parse performance results from markdown report."""
+        try:
+            with open(md_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            format_comparison = {}
+            current_format = None
+            current_query = None
+
+            lines = content.split('\n')
+
+            for line in lines:
+                # Detect format section
+                if line.startswith('### ') and 'Format' in line:
+                    current_format = line.replace('### ', '').replace(' Format', '').lower()
+                    format_comparison[current_format] = {'status': 'completed'}
+
+                # Detect query type
+                elif line.startswith('**') and line.endswith(':**'):
+                    current_query = line.replace('**', '').replace(':', '').lower().replace(' ', '_')
+                    if current_format and current_query:
+                        format_comparison[current_format][current_query] = {}
+
+                # Parse timing data
+                elif current_format and current_query:
+                    if line.startswith('- Mean:'):
+                        try:
+                            mean_time = float(line.split(':')[1].replace('s', '').strip())
+                            format_comparison[current_format][current_query]['mean'] = mean_time
+                        except (ValueError, IndexError):
+                            continue
+                    elif line.startswith('- Median:'):
+                        try:
+                            median_time = float(line.split(':')[1].replace('s', '').strip())
+                            format_comparison[current_format][current_query]['median'] = median_time
+                        except (ValueError, IndexError):
+                            continue
+                    elif line.startswith('- Min:'):
+                        try:
+                            min_time = float(line.split(':')[1].replace('s', '').strip())
+                            format_comparison[current_format][current_query]['min'] = min_time
+                        except (ValueError, IndexError):
+                            continue
+                    elif line.startswith('- Max:'):
+                        try:
+                            max_time = float(line.split(':')[1].replace('s', '').strip())
+                            format_comparison[current_format][current_query]['max'] = max_time
+                        except (ValueError, IndexError):
+                            continue
+
+            return {'format_comparison': format_comparison}
+
+        except Exception as e:
+            logger.error("Failed to parse markdown: %s", e)
+            return {}
+
+    def _create_sample_performance_data(self) -> Dict:
+        """Create sample performance data as fallback."""
+        return {
+            'format_comparison': {
+                'csv': {
+                    'status': 'completed',
+                    'simple_count': {'mean': 0.155, 'median': 0.154, 'min': 0.154, 'max': 0.157}
+                },
+                'parquet': {
+                    'status': 'completed',
+                    'simple_count': {'mean': 0.0003, 'median': 0.0002, 'min': 0.0002, 'max': 0.0004}
+                },
+                'duckdb_table': {
+                    'status': 'completed',
+                    'simple_count': {'mean': 0.0001, 'median': 0.0001, 'min': 0.0001, 'max': 0.0001}
+                },
+                'iceberg': {
+                    'status': 'completed',
+                    'simple_count': {'mean': 0.0002, 'median': 0.0002, 'min': 0.0002, 'max': 0.0002}
+                }
+            }
+        }
+
     def _create_sample_efficiency_data(self) -> Dict:
         """Create sample storage efficiency data."""
         return {

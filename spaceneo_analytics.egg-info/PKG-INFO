@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: spaceneo-analytics
+Version: 0.1.0
+Summary: Space Analytics Demo with DuckDB and Apache Iceberg
+Requires-Python: >=3.8
+Requires-Dist: pandas>=1.5.0
+Requires-Dist: duckdb>=0.9.0
+Requires-Dist: pyiceberg[duckdb,sql]>=0.5.0
+Requires-Dist: plotly>=5.0.0
+Requires-Dist: requests>=2.25.0
+Requires-Dist: pyarrow>=10.0.0
+Provides-Extra: dev
+Requires-Dist: jupyter>=1.0.0; extra == "dev"
+Requires-Dist: notebook>=6.0.0; extra == "dev"
+Requires-Dist: jupyterlab>=3.0.0; extra == "dev"
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
